@@ -21,7 +21,7 @@ using NINA.Plugin.OnStepXTools.Model;
 
 namespace NINA.Plugin.OnStepXTools.ViewModels {
 
-    // Functionality merged into PointGenerationViewModel — no longer a standalone dock panel.
+    // Functionality merged into PointGenerationViewModel (OnStepX Model Builder) — no longer a standalone dock panel.
     [PartCreationPolicy(CreationPolicy.Shared)]
     public class ModelInfoViewModel : DockableVM, ITelescopeConsumer, IDisposable {
         private readonly IOnStepXMount          _mount;

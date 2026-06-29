@@ -62,7 +62,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private double _errorArrowScale = 1.0;
         private string _buildStatusMessage = string.Empty;
 
-        public override string ContentId => "OnStepX_PointGeneration";
+        public override string ContentId => "OnStepX_ModelBuilder";
 
         [ImportingConstructor]
         public PointGenerationViewModel(
@@ -72,7 +72,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             IModelBuilderMediator builderMediator,
             IModelBuilder         builder)
             : base(profile) {
-            Title         = "OnStepX Point Generation";
+            Title         = "OnStepX Model Builder";
             ImageGeometry = System.Windows.Application.Current?.Resources["PolarAlignSVG"] as System.Windows.Media.GeometryGroup;
             _profile         = profile;
             _mount           = mount;
@@ -193,6 +193,10 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         }
 
         public PlotModel ResidualPlot => BuildResidualScatter(_residuals);
+
+        // Called by the view's SizeChanged handler to force OxyPlot to re-render
+        // the sky chart at the new container dimensions.
+        public void RefreshSkyPlot() => RaisePropertyChanged(nameof(SkyPlot));
 
         // ── Build settings (exposed to UI) ───────────────────────────────────────
 

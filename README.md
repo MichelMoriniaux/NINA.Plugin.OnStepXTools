@@ -8,15 +8,14 @@ A [N.I.N.A.](https://nighttime-imaging.eu/) 3.x plugin for mount configuration, 
 
 | Feature | Description |
 |---------|-------------|
-| **Mount Status** | Live RA/Dec, Alt/Az, LST, sidereal time, pier side, tracking state, guide rates, site coordinates, weather from OnStepX sensors |
-| **Mount Settings** | Read and write all runtime mount parameters (tracking rate, guide rate, backlash, limits, meridian flip, park, buzzer) |
-| **Axis Config** | Dynamic discovery and editing of motor parameters via `:GXA{n},{i}#` (OnStepX ≥ 10.26) or composite `:GXA{n}#` (< 10.26) |
-| **Point Generation** | Four algorithms (Golden Spiral, Sidereal Path, Auto Grid, Random) with horizon and meridian exclusion; meridian-crossing-minimised slew order |
-| **Model Info** | Live polar sky chart with visit-path, per-point colour coding, real-time mount crosshair, residual scatter plot; upload coefficients to mount |
-| **Full-Sky Pointing Model** | NINA-sequencer item - plate-solve based all-sky model; 12-parameter least-squares solver matching OnStepX `Align.hs.cpp`; resumable sessions |
-| **Star Alignment** | NINA-sequencer item - plate-solve based alignment; uploads corrected star pairs directly to the OnStepX controller (1–9 stars) |
-| **Clear Alignment** | Sequencer item - clears the model from controller RAM (`:SX09,0#`) |
-| **Save to EEPROM** | Sequencer item - persists the model to non-volatile memory (`:AW#`) |
+| **Mount Status** | Live RA/Dec, Alt/Az, LST, pier side, tracking state, guide rates, site coordinates, weather from OnStepX sensors |
+| **Mount Settings** | All runtime mount parameters (tracking, guide rate, backlash, limits, meridian flip, park, buzzer) plus dynamic axis motor config |
+| **Model Builder** | Point generation, live build, real-time sky chart, residual scatter plot, and coefficient management — all in one panel |
+| **Full-Sky Pointing Model** | Sequencer item — plate-solve based all-sky model; 12-parameter least-squares solver; resumable sessions |
+| **Star Alignment** | Sequencer item — plate-solve based alignment; uploads corrected star pairs to the controller (1–9 stars) |
+| **Clear Alignment** | Sequencer item — clears the model from controller RAM |
+| **Save to EEPROM** | Sequencer item — persists the model to non-volatile memory |
+| **Apply Model from File** | Sequencer item — reads coefficients from a JSON file and writes them directly to the mount |
 
 ---
 
@@ -26,7 +25,7 @@ A [N.I.N.A.](https://nighttime-imaging.eu/) 3.x plugin for mount configuration, 
 - **OnStepX firmware** on the mount controller (tested with 10.25–10.26)
 - **OnStep ASCOM telescope driver** connected and working in NINA
 - **.NET 8.0 for Windows** (bundled with NINA)
-- A camera and plate solver configured in NINA (for model-building sequencer items)
+- A camera and plate solver configured in NINA (for model-building)
 
 ---
 
@@ -51,17 +50,17 @@ Restart NINA; the plugin will appear under **Options → Plugins**.
 
 Copy `NINA.Plugin.OnStepXTools.dll` to the path above.
 
-> **Do not** copy OxyPlot, Newtonsoft.Json, or Autofac - they are already bundled with NINA 3.x.
+> **Do not** copy OxyPlot, Newtonsoft.Json, or Autofac — they are already bundled with NINA 3.x.
 
 ---
 
 ## Quick Start
 
 1. Connect your OnStep mount in NINA via the ASCOM telescope driver.
-2. The **OnStepX Mount Status**, **Mount Settings**, and **Axis Config** panels will populate automatically in the Imaging tab as soon as the telescope connects.
-3. Use **OnStepX Point Generation** to generate a sky coverage plan and save or send it to a sequencer item.
-4. Add the **OnStepX Full-Sky Pointing Model** sequencer item to an Advanced Sequence, load the points, and run the sequence.
-5. Review residuals in **OnStepX Model Info** and click **Write to Mount** when satisfied.
+2. The **OnStepX Mount Status** and **Mount Settings** panels populate automatically when the telescope connects.
+3. Open **OnStepX Model Builder**, pick a mode (Full-Sky or Star Alignment), choose an algorithm, and click **▶ Generate Points**.
+4. Review the sky chart, adjust settings, then click **▶ Start Build** to run the build directly from the panel — or load the points into a sequencer item for unattended operation.
+5. After the build, review residuals in the lower-left scatter plot and coefficients in the left column. Click **Write to Mount** when satisfied.
 
 ---
 
@@ -72,10 +71,10 @@ Copy `NINA.Plugin.OnStepXTools.dll` to the path above.
 Displays live telemetry from NINA's telescope mediator (`ITelescopeConsumer`) refreshed on every mount update:
 
 - Equatorial position (RA/Dec) and horizontal position (Alt/Az)
-- Sidereal time (LST in HH:MM:SS), UTC, hours to meridian, time-to-flip
-- Mount state: tracking on/off, tracking rate, slewing, at-park, at-home, pier side, epoch
-- Guide rates (RA and Dec in arcsec/s)
-- Site latitude, longitude, elevation, alignment mode, driver info
+- Sidereal time (LST), UTC, hours to meridian, time-to-flip
+- Mount state: tracking on/off, tracking rate (Sidereal/Lunar/Solar/King), slewing, at-park, at-home, pier side, epoch
+- Guide rates (RA and Dec in arcsec/s), alignment mode, driver info
+- Site latitude, longitude, elevation
 
 **Weather** (polled from OnStepX sensors every 30 s via LX200 commands):
 
@@ -87,86 +86,116 @@ Displays live telemetry from NINA's telescope mediator (`ITelescopeConsumer`) re
 | Dew point | `:GX9E#` |
 | Controller temperature | `:GX9F#` |
 
+---
+
 ### OnStepX Mount Settings
 
 Reads all current mount runtime parameters on telescope connect and allows editing them. Organised into sections:
 
-- **Site Location** - latitude/longitude in DMS (read) and decimal degrees (edit), Set button
-- **Tracking** - on/off, rate (Sidereal/Lunar/Solar/King), rate compensation, frequency adjust (±0.02 Hz, reset)
-- **Guide Rate & Slew Speed** - 10-level guide rate (0.25× to VVF), slew speed (VSlow–VFast)
-- **Meridian Flip & Park** - auto flip, pause at home, preferred pier side, trigger flip, set park position, goto buzzer
-- **Backlash** - axis 1 and axis 2 in arcseconds (`:%BR#` / `:%BD#`)
-- **Limits** - minimum/maximum altitude, degrees past meridian east/west
+- **Site Location** — current lat/lon shown; **Sync from N.I.N.A.** button uploads NINA's profile coordinates to the mount
+- **Tracking** — on/off, rate (Sidereal/Lunar/Solar/King), rate compensation, frequency adjust (±0.02 Hz, reset)
+- **Guide Rate & Slew Speed** — 10-level guide rate (0.25× to VVF), slew speed (VSlow–VFast)
+- **Meridian Flip & Park** — auto flip, pause at home, preferred pier side, trigger flip, set park position, buzzer
+- **Backlash** — axis 1 and axis 2 in arcseconds (`:%BR#` / `:%BD#`)
+- **Limits** — minimum/maximum altitude, degrees past meridian east/west
 
-Commands use verified OnStepX LX200 syntax (SmartWebServer source cross-referenced).
-
-### OnStepX Axis Config
+**Axis Configuration** (bottom of the same panel):
 
 Reads axis motor configuration using the dynamic `:GXA{n},{i}#` parameter system.
 
-**Firmware version detection** - the panel reads the firmware version from `TelescopeInfo.Description` (e.g. `"On-Step 10.25p"`) and selects the appropriate command format:
+**Firmware version detection** — the panel reads the firmware version from `TelescopeInfo.Description` and selects the appropriate command format:
 
 | Version | GET command | SET command |
 |---------|-------------|-------------|
-| < 10.26 | `:GXA{n}#` - one composite string per axis | `:SXA{n},{composite}#` |
+| < 10.26 | `:GXA{n}#` — one composite string per axis | `:SXA{n},{composite}#` |
 | ≥ 10.26 | `:GXA{n},0#` for count, `:GXA{n},{i}#` per parameter | `:SXA{n},{i},{v}#` |
 
-For firmware ≥ 10.26, each parameter shows its name, current value, and valid range as reported by the firmware. Type codes (boolean, integer, float, power-of-2, decay mode) are decoded and shown appropriately.
+For firmware ≥ 10.26, each parameter shows its name, current value, and valid range as reported by the firmware. Mount type (GEM / EQ Fork / Alt-Az) and controller reboot buttons are always available.
 
-Mount type (GEM / EQ Fork / Alt-Az) and controller reboot buttons are always available.
+Commands use verified OnStepX LX200 syntax (SmartWebServer source cross-referenced).
 
-> **Servo calibration** buttons (Track Normally, Record Calibration, etc.) are included but the exact command strings need hardware verification against your firmware version before use.
+---
 
-### OnStepX Point Generation
+### OnStepX Model Builder
 
-Generates a list of sky positions for a model build.
+The combined point-generation and model-management panel. The left column contains all controls; the right column shows the live sky chart.
 
-**Modes**
-- *Full-Sky Pointing Model* - up to 300 points, any algorithm
-- *Star Alignment* - up to 9 stars, same algorithms
+#### Point Generation & Algorithm
 
-**Algorithms**
+**Modes:**
+- *Full-Sky Pointing Model* — up to 300 points, any algorithm, 12-parameter least-squares solver
+- *Star Alignment* — up to 9 stars, on-device controller solve
+
+**Algorithms:**
 
 | Algorithm | Description |
 |-----------|-------------|
-| **Golden Spiral** | Fibonacci lattice - uniform area density across the visible sky sector |
-| **Auto Grid** | Equal-area latitude-weighted grid - automatically sizes altitude bands and azimuth steps from the point count |
-| **Random** | Uniform area random - samples sin(alt) uniformly to avoid clustering near the zenith |
-| **Sidereal Path** | HA/Dec grid - three declination bands (target ± Dec step) swept across a configurable hour angle range; useful for one-night model building |
+| **Golden Spiral** | Fibonacci lattice — uniform area density across the visible sky sector |
+| **Auto Grid** | Equal-area latitude-weighted grid — automatically sizes altitude bands and azimuth steps |
+| **Random** | Uniform area random — samples sin(alt) uniformly to avoid clustering near the zenith |
+| **Sidereal Path** | HA/Dec grid — three declination bands (target ± Dec step) swept across a configurable hour angle range |
 
-All algorithms apply:
-- Altitude range filter (min/max altitude)
-- Custom NINA horizon filter
-- Meridian exclusion zone (from NINA meridian flip settings)
-- Meridian-crossing-minimised slew order (East side first, then West, nearest-neighbour within each hemisphere)
+**Options:**
+- **Meridian Exclusion Zone** — configurable half-width in degrees (pre-filled from NINA's meridian flip setting)
+- **Altitude Range** — min/max altitude for point placement
+- **Point Count** — slider with mode-appropriate tick frequency (steps of 1 for Star Alignment, 20 for Full-Sky)
 
-The sky chart (azimuthal equidistant projection, `PlotType.Cartesian` for true circles) shows:
-- Altitude rings (0°, 20°, 40°, 60°, 80°)
-- Custom horizon polygon (grey fill)
-- Meridian exclusion zone (light blue wedge)
-- Meridian line N–Zenith–S (dashed)
-- Generated points (cyan) connected by planned visit-order path
+All algorithms apply the custom NINA horizon filter and meridian exclusion, then optimise the slew order (East side first, then West, nearest-neighbour within each hemisphere).
 
 Points can be saved to / loaded from `.json` files for reuse across sessions.
 
-### OnStepX Model Info
+#### Direct Build
 
-Shows the current state of the pointing model build in real time.
+A **Build Settings** section below the generator allows running a build directly from the panel without a sequencer:
 
-**Sky chart** (left): azimuthal equidistant polar display with:
-- Planned visit path (loaded from sequencer item even before the build starts)
-- Points colour-coded by state: green (pending) → yellow (in-progress) → red (solved) → dark-red (failed)
-- Error arrows (yellow) for completed points showing direction and magnitude
-- Live mount crosshair (bullseye + arms) updated from `ITelescopeConsumer`
+- **Exposure** — capture duration per pointing star (seconds)
+- **Settle** — wait time after each slew (seconds)
+- **▶ Start Build** — initiates the build using the current point list; requires telescope connected
+- **■ Cancel** — aborts after the current point completes
 
-**Residual plot** (right): ΔRA vs ΔDec scatter with RMS circle.
+The build uses the same `ModelBuilder` pipeline as the sequencer items, so session persistence, progress events, and mediator notifications all work identically.
 
-**Action buttons**:
-- **Write to Mount** - uploads all 12 coefficients via `:SX0n,v#`
-- **Save Model…** / **Load Model…** - JSON file I/O
-- **Force Model Activation** - sends `:SX09,2#` to force the controller to apply the model
+#### Live Sky Chart (right column)
 
-The panel updates progressively - residuals appear after each completed point, not only at the end of the run.
+Azimuthal equidistant projection (`PlotType.Cartesian`, North up). During a build the chart updates after every point:
+
+| Colour | Meaning |
+|--------|---------|
+| Cyan | Planned / pending |
+| **Green** | Solved and added |
+| Yellow | In progress (slewing, settling, exposing, plate-solving) |
+| Red | Failed |
+| Yellow arrow | Residual error vector (length scaled to longest error × arrow scale) |
+| White crosshair | Live mount position (bullseye + arms) |
+| Blue wedge | Meridian exclusion zone |
+| Grey fill | Custom horizon (below = excluded) |
+
+#### Model Coefficients & Actions (left column, after build)
+
+When a model is available (from a build or loaded from file), the left column shows:
+
+**12-coefficient table (2 × 6):**
+
+| | Col 1 | Col 2 |
+|-|-------|-------|
+| Row 1 | ax1 — HA index error (″) | ax2 — Dec index error (″) |
+| Row 2 | alt — polar altitude (″) | azm — polar azimuth (″) |
+| Row 3 | do — Dec/HA orthogonality (″) | pd — polar Dec misalignment (″) |
+| Row 4 | df — Dec flexure (″) | tf — tube flexure (″) |
+| Row 5 | hcp — HA harmonic phase (°) | hca — HA harmonic amplitude (″) |
+| Row 6 | dcp — Dec harmonic phase (°) | dca — Dec harmonic amplitude (″) |
+
+**Arrow scale slider** — multiplies the auto-scaled residual error arrow lengths on the sky chart.
+
+**Action buttons:**
+- **Write to Mount** — uploads all 12 coefficients via `:SX0n,v#`
+- **Save to EEPROM** — writes to mount then calls `:AW#`
+- **Save Model…** / **Load Model…** — JSON file I/O
+- **Force Activate** — sends `:SX09,2#` to force the controller to apply the model
+
+#### Residuals Chart (bottom-left, square)
+
+ΔRA vs ΔDec scatter plot with a Jet colour axis (total error magnitude) and a dashed RMS circle. Updates progressively after each solved point during a build.
 
 ---
 
@@ -174,27 +203,24 @@ The panel updates progressively - residuals appear after each completed point, n
 
 ### OnStepX Full-Sky Pointing Model
 
-Automated plate-solve based all-sky pointing model. Add to an Advanced Sequence after pointing model points have been generated.
+Automated plate-solve based all-sky pointing model. Add to an Advanced Sequence after generating points.
 
-**Options**:
-- **Write model to mount on completion** - uploads solved coefficients via `:SX0n,v#`
-- **Resume last session** - reloads the most recent interrupted session from disk; already-completed points are skipped
-- **Save coefficients to file** - writes a `.json` file on completion (loadable in Model Info View via Load Model…)
-- **Load from file / Use generated points** - sets the point list
-
-**Exposure time** comes from NINA's plate-solve settings (`Profile → Plate Solving → Exposure Time`), not from the sequencer item.
+**Options:**
+- **Write model to mount on completion** — uploads solved coefficients via `:SX0n,v#`
+- **Resume last session** — reloads the most recent interrupted session from disk; already-completed points are skipped
+- **Save coefficients to file** — writes a `.json` file on completion (loadable via Load Model in the panel)
+- **Load from file / Use generated points** — sets the point list
 
 The build loop per point:
 1. Convert Alt/Az → apparent RA/Dec (with atmospheric refraction using mount weather sensors)
 2. Slew to apparent coordinates
-3. Settle (3 s default)
+3. Settle (configurable)
 4. Read mount RA/Dec and LST
 5. Capture image (NINA imaging mediator)
-6. Plate solve (NINA configured solver, JNOW coordinates)
-7. Convert solve result J2000 → JNOW
-8. Compute pointing errors (ΔRA, ΔDec in arcseconds)
-9. Save point to disk atomically
-10. Notify Model Info panel
+6. Plate solve (NINA configured solver, JNOW coordinates — J2000 result transformed to JNOW)
+7. Compute pointing errors (ΔRA, ΔDec in arcseconds)
+8. Save point to disk atomically
+9. Notify Model Builder panel (sky chart and residuals update live)
 
 On completion, the 12-parameter least-squares solver runs. The design matrix matches OnStepX `Align.hs.cpp` exactly so coefficients can be uploaded directly without conversion.
 
@@ -205,7 +231,7 @@ Sessions are stored in:
 
 ### OnStepX Star Alignment
 
-Same workflow as Full-Sky Pointing Model but uses the on-device solver (1–9 stars). Each successfully solved point is uploaded to the controller via:
+Same workflow as Full-Sky Pointing Model but uses the on-device controller solver (1–9 stars). Each successfully solved point is uploaded to the controller via:
 
 ```
 :SX0A,<actual HA arcsec>#
@@ -216,25 +242,34 @@ Same workflow as Full-Sky Pointing Model but uses the on-device solver (1–9 st
 :SX09,1#   (trigger solve)
 ```
 
-**Options**: Save to EEPROM on completion.
+**Options:** Save to EEPROM on completion.
 
-### Clear Alignment Model / Save to EEPROM
+### Clear Alignment Model
 
-Simple single-command sequencer items for use in sequences:
-
+Erases the model from controller RAM:
 ```
-:SX09,0#   - erase model from RAM (does not affect EEPROM)
-:AW#        - persist model to non-volatile memory
+:SX09,0#
 ```
+
+### Save to EEPROM
+
+Persists the current model to non-volatile memory:
+```
+:AW#
+```
+
+### Apply Model from File
+
+Reads a `.json` coefficient file (saved by any build) and writes all 12 parameters directly to the mount via `:SX0n,v#`. Optionally also calls `:AW#` to persist to EEPROM.
 
 ---
 
 ## Plate Solving Notes
 
 - Exposure time is read from `profileService.ActiveProfile.PlateSolveSettings.ExposureTime`
-- The plugin uses NINA's `IPlateSolverFactory.GetPlateSolver(settings)` - whatever solver you have configured in NINA's options (ASTAP, Astrometry.net, ANSVR, etc.)
+- The plugin uses NINA's `IPlateSolverFactory.GetPlateSolver(settings)` — whatever solver you have configured in NINA (ASTAP, Astrometry.net, ANSVR, etc.)
 - Plate solve results are in J2000 epoch. The plugin converts to JNOW using `result.Coordinates.Transform(Epoch.JNOW)` before comparing with the mount's JNOW coordinates
-- **No sync is performed** after solving - the plugin only reads the solved coordinates; the mount's pointing model is never modified by NINA's sync mechanism
+- **No sync is performed** after solving — the plugin only reads the solved coordinates; the mount's pointing model is never modified by NINA's sync mechanism
 
 ---
 
@@ -272,13 +307,13 @@ errD = ax2Cor·p + altCor·cosH + azmCor·sinH
 Where `p` = pier side (+1 pierEast, −1 pierWest) matching OnStep's convention.
 
 Key implementation notes:
-- `dH = −errRA / cos(Dec)` - HA arcseconds, not RA on-sky arcseconds
+- `dH = −errRA / cos(Dec)` — HA arcseconds, not RA on-sky arcseconds
 - `ax1Cor` design-matrix coefficient is **−1** (errH = −ax1Cor + …)
 - `ax2Cor`, `doCor`, and harmonics carry the **pier sign**
 - `dfCor` uses the latitude-aware GEM formula (not the simplified fork formula)
 - `tfCor` includes site latitude in both ΔH and ΔD
 
-**Minimum points**: 6 (for 12 unknowns). Reliable polar alignment extraction requires 30+ points well distributed across both pier sides and all declination zones.
+**Minimum points:** 6 (for 12 unknowns). Reliable polar alignment extraction requires 30+ points well distributed across both pier sides and all declination zones.
 
 ---
 
@@ -286,11 +321,11 @@ Key implementation notes:
 
 | Operation | GET | SET |
 |-----------|-----|-----|
-| Alignment star count | `:GX09#` | - |
-| Clear model | - | `:SX09,0#` |
-| Compute model | - | `:SX09,1#` |
-| Force model activation | - | `:SX09,2#` |
-| Persist to EEPROM | - | `:AW#` |
+| Alignment star count | `:GX09#` | — |
+| Clear model | — | `:SX09,0#` |
+| Compute model (Star Align) | — | `:SX09,1#` |
+| Force model activation | — | `:SX09,2#` |
+| Persist to EEPROM | — | `:AW#` |
 | Coefficient n (hex) | `:GX0n#` | `:SX0n,v#` |
 | Backlash axis 1 | `:%BR#` | `:$BR{v}#` |
 | Backlash axis 2 | `:%BD#` | `:$BD{v}#` |
@@ -299,9 +334,15 @@ Key implementation notes:
 | Meridian E limit | `:GXE9#` | `:SXE9,{v}#` |
 | Meridian W limit | `:GXEA#` | `:SXEA,{v}#` |
 | Preferred pier side | `:GXE8#` | `:SXE8,{v}#` |
+| Auto meridian flip | `:GXE6#` | `:SXE6,{v}#` |
+| Pause at home | `:GXE7#` | `:SXE7,{v}#` |
 | Axis parameters (≥10.26) | `:GXA{n},{i}#` | `:SXA{n},{i},{v}#` |
-
-> Command strings marked as needing hardware verification in the code comments have been cross-referenced with the [SmartWebServer source](https://github.com/hjd1964/SmartWebServer) but should be validated against your specific firmware version before use in production.
+| Weather temp | `:GX9A#` | — |
+| Weather pressure | `:GX9B#` | — |
+| Weather humidity | `:GX9C#` | — |
+| Weather dew point | `:GX9E#` | — |
+| Controller temp | `:GX9F#` | — |
+| Last error | `:GXE0#` | — |
 
 ---
 
@@ -313,18 +354,13 @@ Build sessions are written atomically (write to `.tmp`, rename) after every succ
 %APPDATA%\NINA\Plugins\OnStepX\ModelBuilds\{sessionId}.json
 ```
 
-Settings file:
-```
-%APPDATA%\NINA\Plugins\OnStepX\settings.json
-```
-
 ---
 
 ## Comparison with TPoint
 
 ### Pointing Model Capability
 
-**TPoint** uses an open-ended term library - users can add or remove correction terms (typically 20–40 for a serious model: `NPAE`, `MA`, `ME`, `TF`, `FF`, `DAF`, `ACEC`, `ACES`, `NDD`, `NDS`, and many more). The model is built incrementally and can be re-fit without re-observing.
+**TPoint** uses an open-ended term library — users can add or remove correction terms (typically 20–40 for a serious model). The model is built incrementally and can be re-fit without re-observing.
 
 **This plugin** uses exactly the 12 parameters that OnStepX's `Align.hs.cpp` supports:
 
@@ -333,24 +369,22 @@ ax1Cor, ax2Cor, altCor, azmCor, doCor, pdCor,
 dfCor,  tfCor,  hcp,    hca,    dcp,   dca
 ```
 
-This ceiling is set by the mount firmware, not by this plugin. The plugin cannot do better than the firmware can correct.
+This ceiling is set by the mount firmware, not by this plugin.
 
-**Gap**: TPoint is substantially more expressive. For a Paramount or similar high-end mount it can model tube sag, fork flex, and periodic error harmonics at arbitrary frequency, all simultaneously. OnStepX has two harmonics (one RA, one Dec) with pier-sign.
+**Gap:** TPoint is substantially more expressive. For a high-end mount it can model tube sag, fork flex, and periodic error harmonics at arbitrary frequency, simultaneously. OnStepX has two harmonics (one RA, one Dec) with pier-sign.
 
 ### Solver Robustness
 
-**TPoint** has ~30 years of field refinement. It handles ill-conditioned systems gracefully, performs iterative outlier rejection (sigma-clipping), and can weight individual points by time or altitude.
+**TPoint** has ~30 years of field refinement: iterative outlier rejection, conditioning warnings, per-point weighting.
 
 **This plugin** uses a single-pass normal-equations solver with Tikhonov regularisation (λ = 1×10⁻⁶). During development several critical correctness bugs were found and fixed:
-- Wrong epoch (J2000 vs JNOW) causing ~1300" systematic Dec error
+- Wrong epoch (J2000 vs JNOW) causing ~1300″ systematic Dec error
 - Wrong sign on `ax1Cor` in the design matrix
 - Missing pier-sign on `ax2Cor`, `doCor`, and harmonics
 - Wrong `tfCor`/`dfCor` formulas (not matching `Align.hs.cpp`)
 - `goodPoints` filter threshold 60× too tight for unaligned mounts
 
-The solver is now aligned with OnStepX firmware math, but it has not been validated at the same level as TPoint.
-
-**Gap**: Significant. TPoint's solver is battle-tested. This solver has only been exercised on a handful of real datasets.
+**Gap:** Significant. TPoint's solver is battle-tested. This solver has been exercised on a limited number of real datasets.
 
 ### Minimum Points & Conditioning
 
@@ -358,50 +392,45 @@ The solver is now aligned with OnStepX firmware math, but it has not been valida
 |-|-------------|--------|
 | Parameters | 12 | 6 – 40+ (user-selected) |
 | Minimum points | 6 (barely overdetermined) | Typically 20–30 for stable results |
-| With 9 points | Polar alignment unreliable | TPoint would flag as under-sampled |
 | Recommended | 30+ for stable 12-param fit | 50–100 for full model |
 
-With fewer than ~30 points distributed across both pier sides and all declination zones, the individual parameters (especially polar alignment `altCor`/`azmCor`) are unreliable even though the overall RMS may look acceptable.
+With fewer than ~30 points distributed across both pier sides and all declination zones, the individual parameters (especially polar alignment `altCor`/`azmCor`) are unreliable even if the overall RMS looks acceptable.
 
 ### Workflow Integration
 
-**TPoint** is a standalone desktop application. The user runs it separately from their imaging software, exports the model, imports it into mount control software.
+**TPoint** is a standalone desktop application separate from imaging software.
 
 **This plugin** is native inside NINA:
-- Point generation, sequencer item, live sky chart, and residual display are all in one workflow
-- The model is uploaded directly to the mount mid-sequence via `:SX0n,v#`
+- Point generation, direct build trigger, live sky chart, and residual display are all in one panel
+- The model is uploaded directly to the mount via `:SX0n,v#`
 - Refraction uses actual mount weather sensors
-- Resume after interruption works via JSON session files
+- Resumable sessions via JSON files
 
-**Advantage here**: The integration is tighter and more convenient for OnStepX users already using NINA.
+**Advantage here:** Tighter integration and more convenient for OnStepX users already using NINA.
 
 ### Real-Time Correction
 
-**TPoint** outputs corrections that the mount control application applies. The mount itself may or may not see them depending on integration.
-
-**This plugin** writes coefficients directly into OnStepX firmware. The mount's own `Align.hs.cpp` applies them on every goto/track update in real time - no external software required after upload.
-
-**Advantage here**: Zero latency and works even without a PC connected after the model is uploaded.
+**This plugin** writes coefficients directly into OnStepX firmware. The mount's own `Align.hs.cpp` applies them on every goto/track update in real time — no external software required after upload.
 
 ### What This Plugin Does Well
 
-- Deep OnStepX integration - coefficients go directly into the firmware in the right format
-- Native NINA sequencer workflow - no extra tools
+- Deep OnStepX integration — coefficients go directly into the firmware in the correct format
+- Native NINA sequencer workflow — no extra tools
 - Correct atmospheric refraction using mount sensors
-- Pier-side-aware design matrix (matching the firmware's equations exactly)
-- Live visual feedback during build (path, coloured points, growing residual plot)
+- Pier-side-aware design matrix (matching the firmware equations exactly)
+- Live visual feedback during build (coloured points, growing residual plot, mount crosshair)
+- Direct build launch from the panel (no sequence required)
 
 ### What TPoint Does Better
 
-- Far more correction terms for complex mechanical behavior
+- Far more correction terms for complex mechanical behaviour
 - Decades of solver validation and field testing
 - Explicit conditioning warnings and sigma-clipping
 - Works with many mount platforms, not just OnStepX
 - Professional reporting (print-quality charts, statistics)
-- Can identify specific mechanical problems by term inspection
 
 ### Bottom Line
 
-For an OnStepX mount used with NINA, this plugin is a practical and well-integrated solution. The 12-parameter model matches what the firmware can actually apply, so adding more terms (as TPoint could) would not improve pointing anyway.
+For an OnStepX mount used with NINA, this plugin is a practical and well-integrated solution. The 12-parameter model matches what the firmware can actually apply, so adding more terms would not improve pointing anyway.
 
-However, **the solver is new code that has only recently had foundational bugs corrected**, and real-world validation with more datasets and diverse mount types has not yet been done. For mounts and operators where pointing accuracy is mission-critical, TPoint (or a mature alternative like PemPro) remains the more reliable choice until this solver accumulates more field validation.
+However, **the solver is relatively new code** and real-world validation across diverse mount types and declination distributions is ongoing. For operators where pointing accuracy is mission-critical, TPoint remains the more extensively validated choice.

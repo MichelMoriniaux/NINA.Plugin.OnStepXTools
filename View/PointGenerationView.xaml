@@ -383,7 +383,15 @@
         </Grid>
 
         <!-- ── Sky chart ─────────────────────────────────────────────────────── -->
-        <oxy:PlotView Grid.Column="1" Model="{Binding SkyPlot}" Background="#0a0a1e"
-                      ToolTip="Azimuthal sky projection (North top). Cyan = planned, Green = solved, Yellow = in progress, Red = failed. Yellow arrows show residual errors."/>
+        <!-- SizeChanged fires RefreshSkyPlot() which pushes a new PlotModel into the
+             PlotView, forcing OxyPlot to re-render at the current container size.
+             Without this, OxyPlot caches its canvas dimensions and the chart only
+             shrinks — it never expands when the window grows. -->
+        <Grid Grid.Column="1" SizeChanged="SkyContainer_SizeChanged">
+            <oxy:PlotView Model="{Binding SkyPlot}" Background="#0a0a1e"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          MinWidth="0" MinHeight="0"
+                          ToolTip="Azimuthal sky projection (North top). Cyan = planned, Green = solved, Yellow = in progress, Red = failed. Yellow arrows show residual errors."/>
+        </Grid>
     </Grid>
 </UserControl>

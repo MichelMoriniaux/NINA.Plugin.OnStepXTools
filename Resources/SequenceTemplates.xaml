@@ -93,8 +93,8 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="Use generated points"
                                 Command="{Binding UseGeneratedCommand}" Padding="8,2"
-                                ToolTip="Use the point list currently shown in the OnStepX Point Generation panel"/>
-                        <TextBlock Grid.Column="1" Text="Copy points from the Point Generation panel"
+                                ToolTip="Use the point list currently shown in the OnStepX Model Builder panel"/>
+                        <TextBlock Grid.Column="1" Text="Copy points from the Model Builder panel"
                                    Foreground="Gray" FontSize="10" FontStyle="Italic"
                                    Margin="8,4,0,0" VerticalAlignment="Top"/>
                     </Grid>
@@ -157,8 +157,8 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="Use generated points"
                                 Command="{Binding UseGeneratedCommand}" Padding="8,2"
-                                ToolTip="Use the point list from the OnStepX Point Generation panel (Star Alignment mode, max 9)"/>
-                        <TextBlock Grid.Column="1" Text="Copy points from the Point Generation panel"
+                                ToolTip="Use the point list from the OnStepX Model Builder panel (Star Alignment mode, max 9)"/>
+                        <TextBlock Grid.Column="1" Text="Copy points from the Model Builder panel"
                                    Foreground="Gray" FontSize="10" FontStyle="Italic"
                                    Margin="8,4,0,0" VerticalAlignment="Top"/>
                     </Grid>
