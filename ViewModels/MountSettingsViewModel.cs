@@ -1,0 +1,586 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel.Composition;
+using System.Globalization;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using NINA.Core.Utility;
+using NINA.Equipment.Equipment.MyTelescope;
+using NINA.Equipment.Interfaces.Mediator;
+using NINA.Equipment.Interfaces.ViewModel;
+using NINA.Profile.Interfaces;
+using NINA.WPF.Base.ViewModel;
+using NINA.Plugin.OnStepXTools.Model;
+
+namespace NINA.Plugin.OnStepXTools.ViewModels {
+
+    [Export(typeof(IDockableVM))]
+    [PartCreationPolicy(CreationPolicy.Shared)]
+    public class MountSettingsViewModel : DockableVM, ITelescopeConsumer, IDisposable {
+        private readonly ITelescopeMediator _telescope;
+        private readonly IProfileService    _profile;
+        private bool _wasConnected;
+
+        public override string ContentId => "OnStepX_MountSettings";
+
+        // ── Axis config - firmware version and format detection ────────────────────
+        private int  _fwMajor;
+        private int  _fwMinor;
+        private char _axis1DriverType;
+        private char _axis2DriverType;
+        private bool _axis1OldFormat;
+        private bool _axis2OldFormat;
+
+        [ImportingConstructor]
+        public MountSettingsViewModel(ITelescopeMediator telescope, IProfileService profile)
+            : base(profile) {
+            Title         = "OnStepX Mount Settings";
+            ImageGeometry = System.Windows.Application.Current?.Resources["SettingsSVG"] as System.Windows.Media.GeometryGroup;
+            _telescope    = telescope;
+            _profile   = profile;
+            _telescope.RegisterConsumer(this);
+            BuildCommands();
+        }
+
+        // ── ITelescopeConsumer ───────────────────────────────────────────────────
+
+        public void UpdateDeviceInfo(TelescopeInfo info) {
+            IsConnected = info.Connected;
+            if (info.Connected && !_wasConnected) {
+                // Detect firmware version so axis config uses the right command format
+                try { ParseFirmwareVersion(info.Description ?? string.Empty); } catch { }
+                _ = LoadAllSettingsAsync();
+            }
+            _wasConnected = info.Connected;
+        }
+
+        // ── Connectivity ─────────────────────────────────────────────────────────
+
+        private bool _isConnected;
+        public bool IsConnected { get => _isConnected; private set => SetProperty(ref _isConnected, value); }
+
+        // ── Axis Config ──────────────────────────────────────────────────────────
+
+        private MountType _mountType    = MountType.GEM;
+        private string _axis1DriverId  = string.Empty;
+        private string _axis2DriverId  = string.Empty;
+
+        public MountType MountType     { get => _mountType;     set => SetProperty(ref _mountType,     value); }
+        public string    Axis1DriverId { get => _axis1DriverId; private set => SetProperty(ref _axis1DriverId, value); }
+        public string    Axis2DriverId { get => _axis2DriverId; private set => SetProperty(ref _axis2DriverId, value); }
+
+        public ObservableCollection<AxisParameter> Axis1Params { get; } = new();
+        public ObservableCollection<AxisParameter> Axis2Params { get; } = new();
+
+        // ── Site Location ────────────────────────────────────────────────────────
+        // Read-only display of what the mount currently has (populated on connect)
+
+        private string _latitudeDMS   = string.Empty;
+        private string _longitudeDMS  = string.Empty;
+
+        public string LatitudeDMS  { get => _latitudeDMS;  private set => SetProperty(ref _latitudeDMS,  value); }
+        public string LongitudeDMS { get => _longitudeDMS; private set => SetProperty(ref _longitudeDMS, value); }
+
+        // ── Tracking ─────────────────────────────────────────────────────────────
+
+        private bool _trackingEnabled;
+        private TrackingRate _trackingRate = TrackingRate.Sidereal;
+        private CompensatedTracking _compensatedTracking = CompensatedTracking.Off;
+
+        public bool             TrackingEnabled     { get => _trackingEnabled;     private set => SetProperty(ref _trackingEnabled,     value); }
+        public TrackingRate     TrackingRate        { get => _trackingRate;        set => SetProperty(ref _trackingRate,        value); }
+        public CompensatedTracking CompensatedTracking { get => _compensatedTracking; set => SetProperty(ref _compensatedTracking, value); }
+
+        // ── Guide Rate ───────────────────────────────────────────────────────────
+
+        private int _guideRateIndex = 2; // 0-9; index 2 = 1× sidereal
+        public int GuideRateIndex { get => _guideRateIndex; set => SetProperty(ref _guideRateIndex, value); }
+
+        public static string[] GuideRateNames { get; } =
+            { "0.25×", "0.5×", "1×", "2×", "4×", "8×", "20×", "48×", "VF", "VVF" };
+
+        // ── Slew Speed ───────────────────────────────────────────────────────────
+
+        private SlewSpeed _slewSpeed = SlewSpeed.Normal;
+        public SlewSpeed SlewSpeed { get => _slewSpeed; set => SetProperty(ref _slewSpeed, value); }
+
+        // ── Meridian Flip ────────────────────────────────────────────────────────
+
+        private bool _autoMeridianFlip;
+        private bool _pauseAtHome;
+        private PreferredPierSide _preferredPierSide = PreferredPierSide.Best;
+
+        public bool             AutoMeridianFlip  { get => _autoMeridianFlip;  set => SetProperty(ref _autoMeridianFlip,  value); }
+        public bool             PauseAtHome       { get => _pauseAtHome;       set => SetProperty(ref _pauseAtHome,       value); }
+        public PreferredPierSide PreferredPierSide { get => _preferredPierSide; set => SetProperty(ref _preferredPierSide, value); }
+
+        // ── Alert ────────────────────────────────────────────────────────────────
+
+        private bool _buzzerEnabled;
+        public bool BuzzerEnabled { get => _buzzerEnabled; set => SetProperty(ref _buzzerEnabled, value); }
+
+        // ── Backlash ─────────────────────────────────────────────────────────────
+
+        private int _backlashAxis1;
+        private int _backlashAxis2;
+        public int BacklashAxis1Arcsec { get => _backlashAxis1; set => SetProperty(ref _backlashAxis1, value); }
+        public int BacklashAxis2Arcsec { get => _backlashAxis2; set => SetProperty(ref _backlashAxis2, value); }
+
+        // ── Limits ───────────────────────────────────────────────────────────────
+
+        private double _limitMinAlt;
+        private double _limitMaxAlt = 85;
+        private double _limitEastDeg;
+        private double _limitWestDeg = 15;
+
+        public double LimitMinAltDeg        { get => _limitMinAlt;   set => SetProperty(ref _limitMinAlt,   value); }
+        public double LimitMaxAltDeg        { get => _limitMaxAlt;   set => SetProperty(ref _limitMaxAlt,   value); }
+        public double LimitEastPastMeridian { get => _limitEastDeg;  set => SetProperty(ref _limitEastDeg,  value); }
+        public double LimitWestPastMeridian { get => _limitWestDeg;  set => SetProperty(ref _limitWestDeg,  value); }
+
+        // ── Status ───────────────────────────────────────────────────────────────
+
+        private string _status = string.Empty;
+        public string StatusMessage { get => _status; private set => SetProperty(ref _status, value); }
+
+        // ── Commands ─────────────────────────────────────────────────────────────
+
+        public ICommand LoadCommand              { get; private set; } = null!;
+        public ICommand TrackOnCommand           { get; private set; } = null!;
+        public ICommand TrackOffCommand          { get; private set; } = null!;
+        public ICommand SetTrackRateCommand      { get; private set; } = null!;
+        public ICommand SetCompTrackCommand      { get; private set; } = null!;
+        public ICommand FreqPlusCommand          { get; private set; } = null!;
+        public ICommand FreqMinusCommand         { get; private set; } = null!;
+        public ICommand FreqResetCommand         { get; private set; } = null!;
+        public ICommand SetGuideRateCommand      { get; private set; } = null!;
+        public ICommand SetSlewSpeedCommand      { get; private set; } = null!;
+        public ICommand SetMeridianSettingsCommand { get; private set; } = null!;
+        public ICommand TriggerMeridianFlipCommand { get; private set; } = null!;
+        public ICommand SetParkCommand           { get; private set; } = null!;
+        public ICommand SetBacklashCommand       { get; private set; } = null!;
+        public ICommand SetLimitsCommand         { get; private set; } = null!;
+        public ICommand SyncSiteFromNinaCommand  { get; private set; } = null!;
+
+        // Axis Config commands
+        public ICommand SetMountTypeCommand     { get; private set; } = null!;
+        public ICommand RebootCommand           { get; private set; } = null!;
+        public ICommand SaveAxis1Command        { get; private set; } = null!;
+        public ICommand SaveAxis2Command        { get; private set; } = null!;
+        public ICommand RevertAxis1Command      { get; private set; } = null!;
+        public ICommand RevertAxis2Command      { get; private set; } = null!;
+        public ICommand ServoTrackNormalCommand { get; private set; } = null!;
+        public ICommand ServoTrackFixedCommand  { get; private set; } = null!;
+        public ICommand ServoRecordCommand      { get; private set; } = null!;
+        public ICommand ServoStopCommand        { get; private set; } = null!;
+        public ICommand ServoClearCommand       { get; private set; } = null!;
+        public ICommand ServoLoadCalCommand     { get; private set; } = null!;
+        public ICommand ServoSaveCalCommand     { get; private set; } = null!;
+        public ICommand ServoLoadBackupCommand  { get; private set; } = null!;
+        public ICommand ServoSaveBackupCommand  { get; private set; } = null!;
+        public ICommand ServoHpfCommand         { get; private set; } = null!;
+        public ICommand ServoLpfCommand         { get; private set; } = null!;
+
+        private void BuildCommands() {
+            bool Connected() => _isConnected;
+            void Send(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
+            void SendBlind(string cmd) { try { _telescope.SendCommandBlind(cmd, raw: true); } catch { } }
+
+            LoadCommand = new RelayCommand(
+                async _ => await LoadAllSettingsAsync(), _ => Connected());
+
+            TrackOnCommand  = new RelayCommand(_ => SendBlind(":Te#"), _ => Connected());
+            TrackOffCommand = new RelayCommand(_ => SendBlind(":Td#"), _ => Connected());
+
+            SetTrackRateCommand = new RelayCommand(_ => {
+                SendBlind(TrackingRate switch {
+                    TrackingRate.Lunar   => ":TL#",
+                    TrackingRate.Solar   => ":TS#",
+                    TrackingRate.King    => ":TK#",
+                    _                    => ":TQ#"
+                });
+                Status(":GU#");
+            }, _ => Connected());
+
+            SetCompTrackCommand = new RelayCommand(_ => {
+                // :Tn# = off, :T1# = 1-axis refraction, :T2# = 2-axis refraction, :To# = full model
+                SendBlind(CompensatedTracking switch {
+                    CompensatedTracking.RefractionOnly => ":T1#",
+                    CompensatedTracking.Full           => ":T2#",
+                    _                                  => ":Tn#"
+                });
+            }, _ => Connected());
+
+            FreqPlusCommand  = new RelayCommand(_ => SendBlind(":T+#"), _ => Connected());
+            FreqMinusCommand = new RelayCommand(_ => SendBlind(":T-#"), _ => Connected());
+            FreqResetCommand = new RelayCommand(_ => SendBlind(":TR#"), _ => Connected());
+
+            SetGuideRateCommand = new RelayCommand(_ => {
+                var idx = Math.Clamp(GuideRateIndex, 0, 9);
+                SendBlind($":R{idx}#");
+                StatusMessage = $"Guide rate set to {GuideRateNames[idx]}";
+            }, _ => Connected());
+
+            SetSlewSpeedCommand = new RelayCommand(_ => {
+                SendBlind(SlewSpeed switch {
+                    SlewSpeed.VFast  => ":RS4#",
+                    SlewSpeed.Fast   => ":RS3#",
+                    SlewSpeed.Normal => ":RS2#",
+                    SlewSpeed.Slow   => ":RS1#",
+                    _                => ":RS0#"
+                });
+                StatusMessage = "Slew speed updated.";
+            }, _ => Connected());
+
+            SetMeridianSettingsCommand = new RelayCommand(_ => {
+                SendBlind($":SXE5,{(BuzzerEnabled       ? 1 : 0)}#");
+                SendBlind($":SXE6,{(AutoMeridianFlip    ? 1 : 0)}#");
+                SendBlind($":SXE7,{(PauseAtHome         ? 1 : 0)}#");
+                SendBlind($":SXE8,{(int)PreferredPierSide}#");
+                StatusMessage = "Meridian settings updated.";
+            }, _ => Connected());
+
+            TriggerMeridianFlipCommand = new RelayCommand(_ => {
+                SendBlind(":Mf#");
+                StatusMessage = "Meridian flip triggered.";
+            }, _ => Connected());
+
+            SetParkCommand = new RelayCommand(_ => {
+                SendBlind(":hQ#");
+                StatusMessage = "Park position set to current.";
+            }, _ => Connected());
+
+            SetBacklashCommand = new RelayCommand(_ => {
+                SendBlind($":$BR{BacklashAxis1Arcsec}#");
+                SendBlind($":$BD{BacklashAxis2Arcsec}#");
+                StatusMessage = "Backlash updated.";
+            }, _ => Connected());
+
+            SetLimitsCommand = new RelayCommand(_ => {
+                SendBlind($":Sh{(int)LimitMinAltDeg}#");
+                SendBlind($":So{(int)LimitMaxAltDeg}#");
+                SendBlind($":SXE9,{LimitEastPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#");
+                SendBlind($":SXEA,{LimitWestPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#");
+                StatusMessage = "Limits updated.";
+            }, _ => Connected());
+
+            SyncSiteFromNinaCommand = new RelayCommand(async _ => {
+                try {
+                    var lat  = _profile.ActiveProfile.AstrometrySettings.Latitude;
+                    var lon  = _profile.ActiveProfile.AstrometrySettings.Longitude;
+                    var elev = _telescope.GetInfo().SiteElevation; // mount's current elevation
+                    var latCmd = FormatDMSCommand(lat, degrees: 2);
+                    var lonCmd = FormatDMSCommand(lon, degrees: 3);
+                    SendBlind($":St{latCmd}#");
+                    SendBlind($":Sg{lonCmd}#");
+                    SendBlind($":Sc{((int)elev)}#");
+                    StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F0} m";
+                    await Task.Delay(200);
+                    await LoadAllSettingsAsync();
+                } catch (Exception ex) {
+                    StatusMessage = $"Error: {ex.Message}";
+                }
+            }, _ => Connected());
+
+            void Status(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
+
+            // ── Axis Config commands ─────────────────────────────────────────────
+            SetMountTypeCommand = new RelayCommand(_ => { SendBlind($":SXEM,{(int)MountType}#"); StatusMessage = "Mount type set - reboot required."; }, _ => Connected());
+            RebootCommand       = new RelayCommand(_ => { SendBlind(":ERESET#"); StatusMessage = "Reboot command sent."; }, _ => Connected());
+
+            SaveAxis1Command   = new RelayCommand(async _ => await SaveAxisAsync(1, Axis1Params), _ => Connected());
+            SaveAxis2Command   = new RelayCommand(async _ => await SaveAxisAsync(2, Axis2Params), _ => Connected());
+            RevertAxis1Command = new RelayCommand(_ => { SendBlind(":SXA1,R#"); StatusMessage = "Axis 1 reverted to defaults - reload to verify."; }, _ => Connected());
+            RevertAxis2Command = new RelayCommand(_ => { SendBlind(":SXA2,R#"); StatusMessage = "Axis 2 reverted to defaults - reload to verify."; }, _ => Connected());
+
+            ServoTrackNormalCommand = new RelayCommand(_ => { SendBlind(":TOA#");    StatusMessage = "Track normally."; },      _ => Connected());
+            ServoTrackFixedCommand  = new RelayCommand(_ => { SendBlind(":TOF#");    StatusMessage = "Track fixed rate."; },    _ => Connected());
+            ServoRecordCommand      = new RelayCommand(_ => { SendBlind(":SXC1,1#"); StatusMessage = "Recording…"; },          _ => Connected());
+            ServoStopCommand        = new RelayCommand(_ => { SendBlind(":SXC1,0#"); StatusMessage = "Stopped."; },            _ => Connected());
+            ServoClearCommand       = new RelayCommand(_ => { SendBlind(":SXC2,0#"); StatusMessage = "Buffer cleared."; },     _ => Connected());
+            ServoLoadCalCommand     = new RelayCommand(_ => { SendBlind(":SXC3,0#"); StatusMessage = "Calibration loaded."; }, _ => Connected());
+            ServoSaveCalCommand     = new RelayCommand(_ => { SendBlind(":SXC3,1#"); StatusMessage = "Calibration saved."; },  _ => Connected());
+            ServoLoadBackupCommand  = new RelayCommand(_ => { SendBlind(":SXC4,0#"); StatusMessage = "Backup loaded."; },      _ => Connected());
+            ServoSaveBackupCommand  = new RelayCommand(_ => { SendBlind(":SXC4,1#"); StatusMessage = "Backup saved."; },       _ => Connected());
+            ServoHpfCommand         = new RelayCommand(_ => { SendBlind(":SXC5,1#"); StatusMessage = "High-pass filter."; },   _ => Connected());
+            ServoLpfCommand         = new RelayCommand(_ => { SendBlind(":SXC5,0#"); StatusMessage = "Low-pass filter."; },    _ => Connected());
+        }
+
+        // ── Load settings ────────────────────────────────────────────────────────
+
+        private async Task LoadAllSettingsAsync() {
+            StatusMessage = "Reading mount settings…";
+            try {
+                await Task.Run(() => {
+                    // ─ GU# packed status ─────────────────────────────────────────
+                    var gu = GetStr(":GU#");
+                    if (!string.IsNullOrEmpty(gu)) {
+                        var n = gu.Length;
+                        // End-of-string indices: [...][guideRatePulse][guideRate][errorCode]
+                        if (n >= 2) {
+                            var grIdx = gu[n - 2] - '0';
+                            if (grIdx >= 0 && grIdx <= 9)
+                                Dispatch(() => GuideRateIndex = grIdx);
+                        }
+                        Dispatch(() => {
+                            TrackingEnabled   = !gu.Contains('n');
+                            AutoMeridianFlip  = gu.Contains('a');
+                            PauseAtHome       = gu.Contains('u');
+                            BuzzerEnabled     = gu.Contains('z');
+                            // Rate compensation flags
+                            if      (gu.Contains('t')) CompensatedTracking = CompensatedTracking.Full;
+                            else if (gu.Contains('s')) CompensatedTracking = CompensatedTracking.RefractionOnly;
+                            else if (gu.Contains('r')) CompensatedTracking = CompensatedTracking.RefractionOnly;
+                            else                        CompensatedTracking = CompensatedTracking.Off;
+                        });
+                    }
+
+                    // ─ Preferred pier side (:GXE8#) ─────────────────────────────
+                    var ps = GetStr(":GXE8#");
+                    if (int.TryParse(ps, out var psVal))
+                        Dispatch(() => PreferredPierSide = (PreferredPierSide)Math.Clamp(psVal, 0, 2));
+
+                    // ─ Backlash ──────────────────────────────────────────────────
+                    if (int.TryParse(GetStr(":%BR#"), out var bl1))
+                        Dispatch(() => BacklashAxis1Arcsec = bl1);
+                    if (int.TryParse(GetStr(":%BD#"), out var bl2))
+                        Dispatch(() => BacklashAxis2Arcsec = bl2);
+
+                    // ─ Altitude limits ───────────────────────────────────────────
+                    if (double.TryParse(GetStr(":Gh#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var minAlt))
+                        Dispatch(() => LimitMinAltDeg = minAlt);
+                    if (double.TryParse(GetStr(":Go#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var maxAlt))
+                        Dispatch(() => LimitMaxAltDeg = maxAlt);
+
+                    // ─ Meridian limits ───────────────────────────────────────────
+                    if (double.TryParse(GetStr(":GXE9#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var me))
+                        Dispatch(() => LimitEastPastMeridian = me);
+                    if (double.TryParse(GetStr(":GXEA#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var mw))
+                        Dispatch(() => LimitWestPastMeridian = mw);
+
+                    // ─ Site location (display only - edit via Sync button) ────────
+                    var latStr = GetStr(":GtH#");
+                    var lonStr = GetStr(":GgH#");
+                    if (!string.IsNullOrWhiteSpace(latStr))
+                        Dispatch(() => LatitudeDMS  = latStr);
+                    if (!string.IsNullOrWhiteSpace(lonStr))
+                        Dispatch(() => LongitudeDMS = lonStr);
+                });
+                StatusMessage = "Settings loaded.";
+            } catch (Exception ex) {
+                Logger.Error($"LoadSettings: {ex.Message}");
+                StatusMessage = $"Load error: {ex.Message}";
+            }
+
+            // Load axis configuration after mount settings
+            await LoadAxisConfigAsync();
+        }
+
+        // ── Axis config load ─────────────────────────────────────────────────────
+
+        private async Task LoadAxisConfigAsync() {
+            bool useOld = IsOldFormat;
+            StatusMessage = useOld
+                ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (pre-10.26 format)…"
+                : $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (per-parameter format)…";
+            try {
+                await Task.Run(async () => {
+                    if (useOld) {
+                        await LoadAxisParamsOldFormatAsync(1, Axis1Params);
+                        await LoadAxisParamsOldFormatAsync(2, Axis2Params);
+                    } else {
+                        var d1 = GetStr(":GXA1,M#") ?? "-";
+                        var d2 = GetStr(":GXA2,M#") ?? "-";
+                        Dispatch(() => { Axis1DriverId = d1; Axis2DriverId = d2; });
+                        await LoadAxisParamsNewFormatAsync(1, Axis1Params);
+                        await LoadAxisParamsNewFormatAsync(2, Axis2Params);
+                    }
+                });
+
+                int total = Axis1Params.Count + Axis2Params.Count;
+                StatusMessage = total > 0
+                    ? $"Axis 1: {Axis1Params.Count} params, Axis 2: {Axis2Params.Count} params loaded."
+                    : "Firmware reports 0 runtime-configurable axis parameters (compile-time motor constants).";
+            } catch (Exception ex) {
+                Logger.Error($"LoadAxisConfig: {ex.Message}");
+                StatusMessage = $"Axis config load error: {ex.Message}";
+            }
+        }
+
+        private Task LoadAxisParamsOldFormatAsync(int axis, ObservableCollection<AxisParameter> collection) {
+            return Task.Run(() => {
+                var raw = GetStr($":GXA{axis}#");
+                Logger.Debug($"OnStepX :GXA{axis}# raw: '{raw}'");
+                if (string.IsNullOrWhiteSpace(raw)) return;
+
+                char driverType = raw.Length > 0 && char.IsLetter(raw[^1]) ? char.ToUpperInvariant(raw[^1]) : '\0';
+                var body  = driverType != '\0' ? raw[..^1] : raw;
+                var parts = body.Split(',');
+                var loaded = BuildOldFormatParams(parts, driverType);
+
+                string driverId = driverType switch {
+                    'P' => $"Servo dual-PID ({driverType})",
+                    'T' => $"Step/Dir TMC-SPI ({driverType})",
+                    _   => $"Step/Dir ({driverType})"
+                };
+                if (axis == 1) { _axis1DriverType = driverType; _axis1OldFormat = true; }
+                else           { _axis2DriverType = driverType; _axis2OldFormat = true; }
+
+                Dispatch(() => {
+                    if (axis == 1) Axis1DriverId = driverId;
+                    else           Axis2DriverId = driverId;
+                    collection.Clear();
+                    foreach (var p in loaded) collection.Add(p);
+                });
+            });
+        }
+
+        private static List<AxisParameter> BuildOldFormatParams(string[] parts, char type) {
+            var result = new List<AxisParameter>();
+            int idx = 1;
+            void Add(string name, int fi, string min = "", string max = "", bool isFloat = false) {
+                if (fi >= parts.Length) return;
+                var v = parts[fi].Trim();
+                result.Add(new AxisParameter { Index = idx++, Name = name, CurrentValue = v, Min = min, Max = max,
+                                               TypeCode = isFloat ? 5 : 3, IsImmediate = false, EditValue = v });
+            }
+            Add("Steps per measure",    0, "1", "360000", isFloat: true);
+            Add("Reverse direction",    1, "0", "1");
+            Add("Minimum position (°)", 2, "-360", "360");
+            Add("Maximum position (°)", 3, "-360", "360");
+            switch (type) {
+                case 'P':
+                    Add("P - tracking", 4, isFloat: true); Add("I - tracking", 5, isFloat: true);
+                    Add("D - tracking", 6, isFloat: true); Add("P - goto", 7, isFloat: true);
+                    Add("I - goto", 8, isFloat: true);     Add("D - goto", 9, isFloat: true); break;
+                case 'T':
+                    Add("Microsteps (tracking)", 4); Add("Microsteps (goto)", 5);
+                    Add("Current Hold (mA)", 6, "0", "3000"); Add("Current Run (mA)", 7, "0", "3000");
+                    Add("Current Goto (mA)", 8, "0", "3000"); break;
+                default:
+                    Add("Microsteps (tracking)", 4); Add("Microsteps (goto)", 5); break;
+            }
+            return result;
+        }
+
+        private Task LoadAxisParamsNewFormatAsync(int axis, ObservableCollection<AxisParameter> collection) {
+            return Task.Run(() => {
+                var rawCount = _telescope.SendCommandString($":GXA{axis},0#", raw: true);
+                Logger.Debug($"OnStepX :GXA{axis},0# raw: '{rawCount}'");
+                if (string.IsNullOrWhiteSpace(rawCount)) return;
+                var countStr = rawCount.TrimEnd('#').Trim();
+                if (!int.TryParse(countStr, out var count) || count <= 0) return;
+
+                var loaded = new List<AxisParameter>();
+                for (int i = 1; i <= count; i++) {
+                    var r = GetStr($":GXA{axis},{i}#");
+                    var p = ParseNewFormatParam(i, r);
+                    if (p != null) loaded.Add(p);
+                }
+                Dispatch(() => { collection.Clear(); foreach (var p in loaded) collection.Add(p); });
+            });
+        }
+
+        private async Task SaveAxisAsync(int axis, ObservableCollection<AxisParameter> collection) {
+            StatusMessage = $"Saving Axis {axis}…";
+            bool isOld = axis == 1 ? _axis1OldFormat : _axis2OldFormat;
+            char dtype = axis == 1 ? _axis1DriverType : _axis2DriverType;
+            int saved = 0, failed = 0;
+            await Task.Run(() => {
+                if (isOld) {
+                    var values = new List<string>();
+                    foreach (var p in collection) values.Add(p.EditValue);
+                    if (values.Count > 0 && dtype != '\0') values[^1] += dtype;
+                    var cmd = $":SXA{axis},{string.Join(",", values)}#";
+                    try { var ok = _telescope.SendCommandBool(cmd, raw: true); if (ok) saved = values.Count; else failed = 1; } catch { failed = 1; }
+                } else {
+                    foreach (var param in collection) {
+                        if (param.EditValue == param.CurrentValue) continue;
+                        var cmd = $":SXA{axis},{param.Index},{param.EditValue}#";
+                        try { var ok = _telescope.SendCommandBool(cmd, raw: true); if (ok) saved++; else failed++; } catch { failed++; }
+                    }
+                }
+            });
+            StatusMessage = saved + failed == 0 ? "No changes." : $"Axis {axis}: {saved} saved, {failed} failed.";
+            if (saved > 0) {
+                if (isOld) await LoadAxisParamsOldFormatAsync(axis, collection);
+                else       await LoadAxisParamsNewFormatAsync(axis, axis == 1 ? Axis1Params : Axis2Params);
+            }
+        }
+
+        private bool IsOldFormat => _fwMajor < 10 || (_fwMajor == 10 && _fwMinor < 26);
+
+        private void ParseFirmwareVersion(string description) {
+            _fwMajor = 0; _fwMinor = 0;
+            var m = Regex.Match(description, @"(\d+)\.(\d+)", RegexOptions.IgnoreCase);
+            if (!m.Success) return;
+            int.TryParse(m.Groups[1].Value, out _fwMajor);
+            int.TryParse(m.Groups[2].Value, out _fwMinor);
+            Logger.Info($"OnStepX firmware v{_fwMajor}.{_fwMinor} - axis format: {(IsOldFormat ? "OLD" : "NEW")}");
+        }
+
+        private static AxisParameter? ParseNewFormatParam(int index, string? response) {
+            if (string.IsNullOrWhiteSpace(response)) return null;
+            var parts = response.Split(',', 5);
+            if (parts.Length < 4) return null;
+            int.TryParse(parts[3].Trim(), out var typeCode);
+            var name = parts.Length >= 5 ? parts[4].Trim() : $"Parameter {index}";
+            var value = parts[0].Trim();
+            return new AxisParameter { Index = index, Name = name, CurrentValue = value,
+                Min = parts.Length > 1 ? parts[1].Trim() : "", Max = parts.Length > 2 ? parts[2].Trim() : "",
+                TypeCode = typeCode, IsImmediate = typeCode % 2 == 0 && typeCode > 0, EditValue = value };
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────────
+
+        private string? GetStr(string cmd) {
+            try {
+                var r = _telescope.SendCommandString(cmd, raw: true);
+                return string.IsNullOrWhiteSpace(r) ? null : r.TrimEnd('#').Trim();
+            } catch { return null; }
+        }
+
+        private static void Dispatch(Action a) =>
+            System.Windows.Application.Current?.Dispatcher.Invoke(a);
+
+        // Parse ±DD*MM:SS or ±DDD*MM:SS DMS string from OnStep to decimal degrees
+        private static double ParseDMSResponse(string s) {
+            if (string.IsNullOrWhiteSpace(s)) return 0;
+            var sign = s.StartsWith('-') ? -1 : 1;
+            s = s.TrimStart('+', '-');
+            var degEnd = s.IndexOfAny(new[] { '*', '°', ':' });
+            if (degEnd < 0) return sign * (double.TryParse(s, out var d0) ? d0 : 0);
+            double.TryParse(s[..degEnd], out var deg);
+            var rest = s[(degEnd + 1)..];
+            var minEnd = rest.IndexOf(':');
+            double min = 0, sec = 0;
+            if (minEnd >= 0) {
+                double.TryParse(rest[..minEnd], out min);
+                double.TryParse(rest[(minEnd + 1)..], NumberStyles.Any, CultureInfo.InvariantCulture, out sec);
+            } else {
+                double.TryParse(rest, out min);
+            }
+            return sign * (deg + min / 60.0 + sec / 3600.0);
+        }
+
+        // Format decimal degrees as ±DD*MM:SS (degrees=2) or ±DDD*MM:SS (degrees=3)
+        private static string FormatDMSCommand(double decDeg, int degrees) {
+            var sign = decDeg < 0 ? "-" : "+";
+            decDeg = Math.Abs(decDeg);
+            var d = (int)decDeg;
+            var mFrac = (decDeg - d) * 60;
+            var m = (int)mFrac;
+            var s = (int)Math.Round((mFrac - m) * 60);
+            if (s == 60) { m++; s = 0; }
+            if (m == 60) { d++; m = 0; }
+            var fmt = degrees == 3 ? $"{d:D3}" : $"{d:D2}";
+            return $"{sign}{fmt}*{m:D2}:{s:D2}";
+        }
+
+        public void Dispose() {
+            _telescope.RemoveConsumer(this);
+        }
+    }
+}

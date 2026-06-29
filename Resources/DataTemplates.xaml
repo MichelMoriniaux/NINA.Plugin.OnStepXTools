@@ -1,0 +1,24 @@
+<ResourceDictionary x:Class="NINA.Plugin.OnStepXTools.Resources.DataTemplates"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:NINA.Plugin.OnStepXTools.ViewModels"
+                    xmlns:view="clr-namespace:NINA.Plugin.OnStepXTools.View">
+
+    <!-- Map each ViewModel to its View so NINA's content presenter resolves them -->
+    <DataTemplate DataType="{x:Type vm:MountStatusViewModel}">
+        <view:MountStatusView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:MountSettingsViewModel}">
+        <view:MountSettingsView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:PointGenerationViewModel}">
+        <view:PointGenerationView />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:ModelInfoViewModel}">
+        <view:ModelInfoView />
+    </DataTemplate>
+
+</ResourceDictionary>

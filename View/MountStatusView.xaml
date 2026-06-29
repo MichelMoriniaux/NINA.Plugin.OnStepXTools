@@ -1,0 +1,177 @@
+<UserControl x:Class="NINA.Plugin.OnStepXTools.View.MountStatusView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource BackgroundBrush}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="8">
+
+            <!-- ── Connection header ──────────────────────────────────────────── -->
+            <TextBlock Margin="0,0,0,6" FontSize="12"
+                       ToolTip="Connected telescope driver name and version">
+                <Run Text="{Binding TelescopeName, Mode=OneWay}" FontWeight="Bold"/>
+                <Run Text="  " />
+                <Run Text="{Binding DriverVersion, Mode=OneWay}" Foreground="Gray" FontSize="10"/>
+            </TextBlock>
+
+            <!-- ── Main data (2 columns) ─────────────────────────────────────── -->
+            <Grid Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left column: Position + Time -->
+                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+
+                    <GroupBox Header="Position" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Current mount pointing coordinates reported by the ASCOM driver (JNOW epoch)">
+                        <Grid Margin="4,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="RA:"        Margin="0,1" ToolTip="Right Ascension (JNOW) - HH:MM:SS"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding RightAscensionString}" FontFamily="Courier New" Margin="0,1" ToolTip="Right Ascension in JNOW epoch"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Dec:"       Margin="0,1" ToolTip="Declination (JNOW) - ±DD°MM′SS″"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DeclinationString}"    FontFamily="Courier New" Margin="0,1" ToolTip="Declination in JNOW epoch"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Altitude:"  Margin="0,1" ToolTip="Altitude above the horizon in degrees"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding AltitudeString}"       FontFamily="Courier New" Margin="0,1" ToolTip="Current altitude - below 20° risks atmospheric effects on accuracy"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Azimuth:"   Margin="0,1" ToolTip="Azimuth from North, clockwise (0°=N, 90°=E, 180°=S, 270°=W)"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AzimuthString}"        FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Pier Side:" Margin="0,1" ToolTip="Which side of the pier the OTA is on. East = OTA East (target West of meridian). West = OTA West (target East of meridian)."/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SideOfPier}"           FontFamily="Courier New" Margin="0,1" ToolTip="GEM pier side - determines which side auto-flip occurs on"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Epoch:"     Margin="0,1" ToolTip="Coordinate epoch used by the driver. JNOW = current precessed epoch."/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Epoch}"                FontFamily="Courier New" Margin="0,1"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Header="Time &amp; Meridian" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Sidereal time and meridian transit information">
+                        <Grid Margin="4,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Sidereal:"    Margin="0,1" ToolTip="Local Sidereal Time - the RA of the point currently on the meridian"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding LstString}"          FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="UTC:"          Margin="0,1" ToolTip="Universal Coordinated Time reported by the driver"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding UtString}"           FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="To meridian:"  Margin="0,1" ToolTip="Hour angle remaining until the current target transits the meridian (negative = already past)"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding HoursToMeridian}"    FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Flip in:"      Margin="0,1" ToolTip="Estimated time before the auto meridian flip triggers (based on NINA flip settings)"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding TimeToMeridianFlip}" FontFamily="Courier New" Margin="0,1"/>
+                        </Grid>
+                    </GroupBox>
+
+                </StackPanel>
+
+                <!-- Right column: Mount State + Site -->
+                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+
+                    <GroupBox Header="Mount State" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Real-time mount operational state">
+                        <Grid Margin="4,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Tracking:"   Margin="0,1" ToolTip="Whether the mount is actively tracking the sky"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TrackingEnabled}"     FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Rate:"        Margin="0,1" ToolTip="Active tracking rate: Sidereal / Lunar / Solar / King"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TrackingRateDisplay}" FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Slewing:"     Margin="0,1" ToolTip="True while a goto slew is in progress"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Slewing}"             FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="At Park:"     Margin="0,1" ToolTip="True when the mount is in its parked position"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AtPark}"              FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="At Home:"     Margin="0,1" ToolTip="True when the mount has found its home position"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding AtHome}"              FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Guide RA:"    Margin="0,1" ToolTip="Guide rate for the Right Ascension axis (arcseconds per second)"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding GuideRateRA}"         FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Guide Dec:"   Margin="0,1" ToolTip="Guide rate for the Declination axis (arcseconds per second)"/>
+                            <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding GuideRateDec}"        FontFamily="Courier New" Margin="0,1"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Header="Site &amp; Equipment" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Observer site coordinates and ASCOM driver information">
+                        <Grid Margin="4,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Latitude:"   Margin="0,1" ToolTip="Observer latitude in degrees - positive = North"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SiteLatitude}"  FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Longitude:"  Margin="0,1" ToolTip="Observer longitude in degrees - positive = East"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SiteLongitude}" FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Elevation:"  Margin="0,1" ToolTip="Observer elevation above sea level in metres - used for refraction correction"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SiteElevation}" FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Alignment:"  Margin="0,1" ToolTip="Mount alignment mode reported by the driver (GEM / Fork / AltAz)"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AlignmentMode}" FontFamily="Courier New" Margin="0,1"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Driver:"     Margin="0,1" VerticalAlignment="Top" ToolTip="ASCOM driver identification string"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DriverInfo}"    FontFamily="Courier New" Margin="0,1" TextWrapping="Wrap" FontSize="10"/>
+                        </Grid>
+                    </GroupBox>
+
+                </StackPanel>
+            </Grid>
+
+            <!-- ── Weather (OnStepX :GX9x# - polled every 30 s) ─────────────── -->
+            <GroupBox Header="Weather"
+                      Foreground="{DynamicResource PrimaryBrush}"
+                      ToolTip="Weather data read from OnStepX sensors (:GX9x#) every 30 seconds. Requires sensors to be connected to the controller.">
+                <StackPanel Margin="4,2">
+                    <UniformGrid Rows="1" Columns="5">
+                        <StackPanel Margin="0,0,8,0" ToolTip="Ambient air temperature (:GX9A#)">
+                            <TextBlock Text="Ambient Temp" Foreground="Gray" FontSize="10"/>
+                            <TextBlock Text="{Binding AmbientTemperatureCelsius,    StringFormat='{}{0:F1} °C'}" FontFamily="Courier New"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" ToolTip="Barometric pressure at the site (:GX9B#) - used to compute atmospheric refraction">
+                            <TextBlock Text="Pressure" Foreground="Gray" FontSize="10"/>
+                            <TextBlock Text="{Binding BarometricPressureMb,         StringFormat='{}{0:F1} mb'}" FontFamily="Courier New"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" ToolTip="Relative humidity (:GX9C#)">
+                            <TextBlock Text="Humidity" Foreground="Gray" FontSize="10"/>
+                            <TextBlock Text="{Binding RelativeHumidityPercent,      StringFormat='{}{0:F1} %'}"  FontFamily="Courier New"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" ToolTip="Dew point temperature (:GX9E#) - condensation risk when ambient temperature approaches this value">
+                            <TextBlock Text="Dew Point" Foreground="Gray" FontSize="10"/>
+                            <TextBlock Text="{Binding DewPointCelsius,              StringFormat='{}{0:F1} °C'}" FontFamily="Courier New"/>
+                        </StackPanel>
+                        <StackPanel ToolTip="OnStepX controller board temperature (:GX9F#) - high values may indicate cooling issues">
+                            <TextBlock Text="Controller Temp" Foreground="Gray" FontSize="10"/>
+                            <TextBlock Text="{Binding ControllerTemperatureCelsius, StringFormat='{}{0:F0} °C'}" FontFamily="Courier New"/>
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                ToolTip="Last error message reported by OnStepX (:GXE0#)">
+                        <TextBlock Text="Last error: " Foreground="Gray" FontSize="10" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding LastError}" Foreground="OrangeRed" VerticalAlignment="Center"
+                                   FontFamily="Courier New"/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
