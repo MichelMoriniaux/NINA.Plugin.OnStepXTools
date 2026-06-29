@@ -17,8 +17,5 @@
         <view:PointGenerationView />
     </DataTemplate>
 
-    <DataTemplate DataType="{x:Type vm:ModelInfoViewModel}">
-        <view:ModelInfoView />
-    </DataTemplate>
 
 </ResourceDictionary>

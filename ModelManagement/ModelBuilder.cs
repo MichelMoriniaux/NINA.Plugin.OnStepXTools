@@ -12,11 +12,14 @@ using NINA.Image.Interfaces;
 using NINA.PlateSolving;
 using NINA.PlateSolving.Interfaces;
 using NINA.Profile.Interfaces;
+using System.ComponentModel.Composition;
 using NINA.Plugin.OnStepXTools.Interfaces;
 using NINA.Plugin.OnStepXTools.Model;
 
 namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
+    [Export(typeof(IModelBuilder))]
+    [PartCreationPolicy(CreationPolicy.Shared)]
     public class ModelBuilder : IModelBuilder {
         private readonly IOnStepXMount         _mount;
         private readonly ITelescopeMediator    _telescope;
@@ -26,6 +29,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         private readonly IModelBuilderMediator _mediator;
         private readonly ModelBuildSessionStore _store = new();
 
+        [ImportingConstructor]
         public ModelBuilder(
             IOnStepXMount mount,
             ITelescopeMediator telescope,
