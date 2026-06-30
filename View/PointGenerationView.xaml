@@ -26,10 +26,24 @@
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
 
-                    <!-- Mode -->
-                    <Border Background="{DynamicResource SecondaryBackgroundBrush}"
-                            BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,0,0,8">
+                    <!-- Generate model points -->
+                    <Expander Header="1: Generate Model Points" IsExpanded="True"
+                              Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,8">
+                        <Border Background="{DynamicResource SecondaryBackgroundBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,4,0,0">
                         <StackPanel>
+                    <!-- Result count + Save/Load -->
+                            <TextBlock Text="{Binding Points.Count, StringFormat='{}{0} points generated'}"
+                                    Foreground="{DynamicResource PrimaryBrush}"
+                                    ToolTip="Number of points after filtering"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,8">
+                                <Button Content="Save Points" Command="{Binding SavePointsCommand}" Width="80" Margin="0,0,6,0"
+                                        ToolTip="Export the current point list to a JSON file"/>
+                                <Button Content="Load Points" Command="{Binding LoadPointsCommand}" Width="80"
+                                        ToolTip="Import a point list from a JSON file"/>
+                            </StackPanel>
+
+                    <!-- Mode -->
                             <TextBlock Text="Mode:" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,2"/>
                             <ComboBox SelectedValue="{Binding SelectedMode}" SelectedValuePath="Tag" Margin="0,0,0,8"
                                     ToolTip="Full-Sky Pointing Model: fits 11 parameters (up to 300 stars). Star Alignment: on-device solve (max 9 stars).">
@@ -39,34 +53,18 @@
 
                     <!-- Meridian exclusion zone -->
                             <TextBlock Text="Meridian Exclusion Zone:" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,2"
-                                    ToolTip="Points within this angular distance of the meridian (N and S) are excluded. Pre-filled from N.I.N.A.'s meridian flip setting."/>
+                                    ToolTip="Points within this angular distance of the meridian (N and S) are excluded; pre-filled from N.I.N.A.'s meridian flip setting"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <TextBox Width="55"
                                         Text="{Binding MeridianExclusionDeg, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}"
                                         ToolTip="Half-width of the exclusion zone in degrees of hour angle (0 = no exclusion)"/>
-                                <TextBlock Text=" °" VerticalAlignment="Center" Foreground="Gray"/>
-                            </StackPanel>
-
-                    <!-- Point count -->
-                            <TextBlock Text="Desired Point Count:" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,2"
-                                    ToolTip="Number of sky positions to observe. More points improve model accuracy. Minimum 6 for the pointing model solver."/>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <Slider Width="180" Minimum="1" Maximum="{Binding MaxPointCount}"
-                                        Value="{Binding Options.PointCount}" VerticalAlignment="Center"
-                                        TickFrequency="{Binding TickFrequency}"
-                                        ToolTip="Drag to set the number of points (1 – maximum for the selected mode)"/>
-                                <TextBox Width="50" Margin="4,0,0,0"
-                                        Text="{Binding Options.PointCount, UpdateSourceTrigger=PropertyChanged}"
-                                        ToolTip="Enter the exact point count directly"/>
-                                <TextBlock Text="{Binding MaxPointCount, StringFormat=' /{0}'}"
-                                        VerticalAlignment="Center" Foreground="Gray" FontSize="10"
-                                        ToolTip="Maximum points allowed by the selected mode"/>
+                                <TextBlock Text=" °" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
 
                     <!-- Algorithm -->
                             <TextBlock Text="Algorithm:" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,2"/>
                             <ComboBox SelectedValue="{Binding SelectedMethod}" SelectedValuePath="Tag" Margin="0,0,0,6"
-                                    ToolTip="Point distribution algorithm. Golden Spiral gives uniform sky coverage. Sidereal Path follows a DSO's track. Auto Grid uses an equal-area grid. Random uses seeded uniform sampling.">
+                                    ToolTip="Point distribution algorithm; Golden Spiral gives uniform sky coverage; Sidereal Path follows a DSO's track; Auto Grid uses an equal-area grid; Random uses seeded uniform sampling">
                                 <ComboBoxItem Tag="{x:Static model:GenerationMethod.GoldenSpiral}"
                                             ToolTip="Fibonacci lattice - uniform area density across the altitude band. Best general-purpose choice.">Golden Spiral</ComboBoxItem>
                                 <ComboBoxItem Tag="{x:Static model:GenerationMethod.SiderealPath}"
@@ -102,14 +100,14 @@
                                     </StackPanel>
                                     <TextBlock Text="{Binding Options.SiderealPathDecStepDeg,
                                                     StringFormat='  → three bands: target−{0:F0}°  target  target+{0:F0}°'}"
-                                            Foreground="Gray" FontSize="10" Margin="0,2,0,4"/>
+                                            Foreground="{DynamicResource PrimaryBrush}" FontSize="10" Margin="0,2,0,4"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,2">
                                         <TextBlock Text="Start HA:" Width="80" VerticalAlignment="Center"
                                                 ToolTip="Hour angle at which the path begins. Negative = East of meridian."/>
                                         <TextBox Width="55"
                                                 Text="{Binding Options.SiderealPathStartHours, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}"
                                                 ToolTip="Start of HA sweep in hours. −6 = 6 hours East of meridian."/>
-                                        <TextBlock Text=" h  (−=East)" VerticalAlignment="Center" Foreground="Gray" FontSize="10" Margin="2,0,0,0"/>
+                                        <TextBlock Text=" h  (−=East)" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="10" Margin="2,0,0,0"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,2">
                                         <TextBlock Text="End HA:" Width="80" VerticalAlignment="Center"
@@ -117,9 +115,9 @@
                                         <TextBox Width="55"
                                                 Text="{Binding Options.SiderealPathEndHours, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}"
                                                 ToolTip="End of HA sweep in hours. +6 = 6 hours West of meridian."/>
-                                        <TextBlock Text=" h  (+=West)" VerticalAlignment="Center" Foreground="Gray" FontSize="10" Margin="2,0,0,0"/>
+                                        <TextBlock Text=" h  (+=West)" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="10" Margin="2,0,0,0"/>
                                     </StackPanel>
-                                    <TextBlock Foreground="Gray" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"
+                                    <TextBlock Foreground="{DynamicResource PrimaryBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"
                                             Text="Altitude is determined by HA/Dec geometry. Only the custom horizon filter applies."/>
                                 </StackPanel>
                             </Border>
@@ -130,7 +128,7 @@
                                     BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Altitude Range:" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,2"
-                                            ToolTip="Points outside this altitude band are discarded."/>
+                                            ToolTip="Points outside this altitude band are discarded"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <TextBlock Text="Min:" VerticalAlignment="Center" ToolTip="Minimum altitude in degrees"/>
                                         <TextBox Width="50" Margin="4,0,6,0"
@@ -145,40 +143,37 @@
                                 </StackPanel>
                             </Border>
 
-                    <!-- Generate -->
-                            <Button Content="▶  Generate Points" Command="{Binding GenerateCommand}"
-                                    Padding="8,4" FontWeight="Bold" Margin="0,4,0,8"
-                                    ToolTip="Generate the point list, apply horizon and meridian filters, and optimise slew order"/>
-
-                    <!-- Result count + Save/Load -->
-                            <TextBlock Text="{Binding Points.Count, StringFormat='{}{0} points generated'}"
-                                    Foreground="{DynamicResource PrimaryBrush}"
-                                    ToolTip="Number of points after filtering."/>
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <Button Content="Save Points…" Command="{Binding SavePointsCommand}" Width="80" Margin="0,0,6,0"
-                                        ToolTip="Export the current point list to a JSON file"/>
-                                <Button Content="Load Points…" Command="{Binding LoadPointsCommand}" Width="80"
-                                        ToolTip="Import a point list from a JSON file"/>
+                    <!-- Point count -->
+                            <TextBlock Text="Desired Point Count:" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,2"
+                                    ToolTip="Number of sky positions to observe; changes automatically regenerate points; minimum 6 for the pointing model solver"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <Slider Width="180" Minimum="1" Maximum="{Binding MaxPointCount}"
+                                        Value="{Binding PointCount, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                                        TickFrequency="{Binding TickFrequency}"
+                                        ToolTip="Drag to set the number of points (1 - maximum for the selected mode)"/>
+                                <TextBox Width="50" Margin="4,0,0,0"
+                                        Text="{Binding PointCount, UpdateSourceTrigger=PropertyChanged}"
+                                        ToolTip="Enter the exact point count directly"/>
                             </StackPanel>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </Expander>
 
                     <!-- ═══ Build settings + Start / Cancel ═══════════════════════════ -->
-                    <Border Background="{DynamicResource SecondaryBackgroundBrush}"
-                            BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,0,0,8"
-                            Visibility="{Binding HasPoints, Converter={StaticResource BoolToVis}}"
-                            ToolTip="Available once points have been generated or loaded and mount and camera are connected">
+                    <Expander Header="2: Build Model" IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,8"
+                              IsEnabled="{Binding HasPoints}"
+                              ToolTip="Available once points have been generated or loaded and mount and camera are connected">
+                        <Border Background="{DynamicResource SecondaryBackgroundBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,4,0,0">
                         <StackPanel>
-                            <TextBlock Text="Build Settings" FontWeight="Bold" FontSize="11"
-                                       Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"/>
-
                             <StackPanel Orientation="Horizontal" Margin="0,2">
                                 <TextBlock Text="Exposure:" Width="70" VerticalAlignment="Center"
                                            ToolTip="Capture duration per pointing star (seconds)"/>
                                 <TextBox Width="50"
                                          Text="{Binding ExposureTimeSec, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}"
                                          ToolTip="Image exposure time in seconds for each plate solve"/>
-                                <TextBlock Text=" s" VerticalAlignment="Center" Foreground="Gray"/>
+                                <TextBlock Text=" s" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
@@ -187,7 +182,7 @@
                                 <TextBox Width="50"
                                          Text="{Binding SettleTimeSec, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}"
                                          ToolTip="Slew settle time in seconds"/>
-                                <TextBlock Text=" s" VerticalAlignment="Center" Foreground="Gray"/>
+                                <TextBlock Text=" s" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal">
@@ -201,7 +196,33 @@
                                         ToolTip="Abort the running build after the current point completes"/>
                             </StackPanel>
                         </StackPanel>
-                    </Border>
+                        </Border>
+                    </Expander>
+
+                    <Expander Header="3: Program Model to Mount" IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,8"
+                              IsEnabled="{Binding HasModel}"
+                              ToolTip="Available once a pointing model has been built or loaded">
+                        <Border Background="{DynamicResource SecondaryBackgroundBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,4,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Button Content="Write to Mount" Command="{Binding WriteToMountCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Upload the loaded pointing model coefficients to the mount controller"/>
+                                    <Button Content="Push to EEPROM" Command="{Binding WriteToEepromCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Write coefficients to the mount and persist them to EEPROM (:AW#)"/>
+                                    <Button Content="Force Activate" Command="{Binding ForceActivationCommand}"
+                                            Padding="4,3" FontSize="11"
+                                            ToolTip="Force the mount to activate the current model (:SX09,2#)"/>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding BuildStatusMessage}" FontSize="10"
+                                        Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
 
                     <Border Visibility="{Binding HasModel, Converter={StaticResource BoolToVis}}"
                             Background="{DynamicResource SecondaryBackgroundBrush}"
@@ -235,79 +256,79 @@
 
                                         <!-- Row 0 -->
                                         <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
-                                            <TextBlock Text="ax1:" Width="28" Foreground="Gray" FontSize="11" ToolTip="HA index error (arcseconds)"/>
+                                            <TextBlock Text="ax1:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="HA index error (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.Ax1Cor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                         <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
-                                            <TextBlock Text="ax2:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Dec index error (arcseconds)"/>
+                                            <TextBlock Text="ax2:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Dec index error (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.Ax2Cor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
 
                                         <!-- Row 1 -->
                                         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
-                                            <TextBlock Text="alt:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Polar altitude error (arcseconds)"/>
+                                            <TextBlock Text="alt:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Polar altitude error (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.AltCor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                         <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
-                                            <TextBlock Text="azm:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Polar azimuth error (arcseconds)"/>
+                                            <TextBlock Text="azm:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Polar azimuth error (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.AzmCor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
 
                                         <!-- Row 2 -->
                                         <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
-                                            <TextBlock Text="do:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Dec/HA orthogonality (arcseconds)"/>
+                                            <TextBlock Text="do:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Dec/HA orthogonality (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.DoCor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                         <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
-                                            <TextBlock Text="pd:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Polar Dec misalignment (arcseconds)"/>
+                                            <TextBlock Text="pd:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Polar Dec misalignment (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.PdCor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
 
                                         <!-- Row 3 -->
                                         <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
-                                            <TextBlock Text="df:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Dec flexure (arcseconds)"/>
+                                            <TextBlock Text="df:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Dec flexure (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.DfCor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                         <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
-                                            <TextBlock Text="tf:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Tube/fork flexure (arcseconds)"/>
+                                            <TextBlock Text="tf:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Tube/fork flexure (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.TfCor, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
 
                                         <!-- Row 4 -->
                                         <StackPanel Grid.Row="4" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
-                                            <TextBlock Text="hcp:" Width="28" Foreground="Gray" FontSize="11" ToolTip="HA cosine phase (degrees)"/>
+                                            <TextBlock Text="hcp:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="HA cosine phase (degrees)"/>
                                             <TextBlock Text="{Binding Coefficients.Hcp, StringFormat='{}{0:F2}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="°" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="°" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                         <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
-                                            <TextBlock Text="hca:" Width="28" Foreground="Gray" FontSize="11" ToolTip="HA cosine amplitude (arcseconds)"/>
+                                            <TextBlock Text="hca:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="HA cosine amplitude (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.Hca, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
 
                                         <!-- Row 5 -->
                                         <StackPanel Grid.Row="5" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
-                                            <TextBlock Text="dcp:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Dec cosine phase (degrees)"/>
+                                            <TextBlock Text="dcp:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Dec cosine phase (degrees)"/>
                                             <TextBlock Text="{Binding Coefficients.Dcp, StringFormat='{}{0:F2}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="°" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="°" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                         <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
-                                            <TextBlock Text="dca:" Width="28" Foreground="Gray" FontSize="11" ToolTip="Dec cosine amplitude (arcseconds)"/>
+                                            <TextBlock Text="dca:" Width="28" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" ToolTip="Dec cosine amplitude (arcseconds)"/>
                                             <TextBlock Text="{Binding Coefficients.Dca, StringFormat='{}{0:F1}'}" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
-                                            <TextBlock Text="&quot;" FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="&quot;" FontSize="11" Foreground="{DynamicResource PrimaryBrush}"/>
                                         </StackPanel>
                                     </Grid>
 
                                     <TextBlock Text="{Binding Coefficients.Stars, StringFormat='From {0} stars'}"
-                                            FontSize="10" Foreground="Gray" Margin="0,4,0,0"
+                                            FontSize="10" Foreground="{DynamicResource PrimaryBrush}" Margin="0,4,0,0"
                                             ToolTip="Number of alignment stars used to compute this model"/>
                                 </StackPanel>
                             </Border>
@@ -318,41 +339,25 @@
                                 <StackPanel>
                                     <!-- Arrow scale slider -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                        <TextBlock Text="Error Arrow scale:" VerticalAlignment="Center" Foreground="Gray" FontSize="11" Margin="0,0,4,0"
+                                        <TextBlock Text="Error Arrow scale:" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" Margin="0,0,4,0"
                                                 ToolTip="Multiply the auto-scaled residual error arrow lengths on the sky chart"/>
                                         <Slider Width="110" Minimum="0.5" Maximum="20" SmallChange="0.5" LargeChange="2"
                                                 Value="{Binding ErrorArrowScale}" VerticalAlignment="Center"
                                                 ToolTip="Drag right to lengthen residual error arrows"/>
                                         <TextBlock Text="{Binding ErrorArrowScale, StringFormat=' ×{0:F1}'}"
-                                                VerticalAlignment="Center" Foreground="Gray" FontSize="11"/>
+                                                VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="11"/>
                                     </StackPanel>
 
-                                    <!-- Model action buttons row 1 -->
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <Button Content="Write to Mount" Command="{Binding WriteToMountCommand}"
-                                                Padding="4,3" FontSize="11" Margin="0,0,4,0"
-                                                ToolTip="Upload the loaded pointing model coefficients to the mount controller"/>
-                                        <Button Content="Save to EEPROM" Command="{Binding WriteToEepromCommand}"
-                                                Padding="4,3" FontSize="11"
-                                                ToolTip="Write coefficients to the mount and persist them to EEPROM (:AW#)"/>
-                                    </StackPanel>
-
-                                    <!-- Model action buttons row 2 -->
+                                    <!-- Model file actions -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                         <Button Content="Save Model…" Command="{Binding SaveModelCommand}"
                                                 Padding="4,3" FontSize="11" Margin="0,0,4,0"
                                                 ToolTip="Save the current model coefficients to a JSON file"/>
                                         <Button Content="Load Model…" Command="{Binding LoadModelCommand}"
-                                                Padding="4,3" FontSize="11" Margin="0,0,4,0"
-                                                ToolTip="Load model coefficients from a JSON file"/>
-                                        <Button Content="Force Activate" Command="{Binding ForceActivationCommand}"
                                                 Padding="4,3" FontSize="11"
-                                                ToolTip="Force the mount to activate the current model (:SX09,2#)"/>
+                                                ToolTip="Load model coefficients from a JSON file"/>
                                     </StackPanel>
 
-                                    <!-- Status -->
-                                    <TextBlock Text="{Binding BuildStatusMessage}" FontSize="10"
-                                            Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -361,34 +366,34 @@
                     <!-- ═══ Legend ════════════════════════════════════════════════════ -->
                     <Border Margin="0,10,0,4" Padding="4" BorderThickness="0">
                         <StackPanel>
-                            <TextBlock Text="Chart legend:" Foreground="Gray" FontSize="10" Margin="0,0,0,2"/>
+                            <TextBlock Text="Chart legend:" Foreground="{DynamicResource PrimaryBrush}" FontSize="10" Margin="0,0,0,2"/>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Rectangle Width="12" Height="4" Fill="CornflowerBlue" Margin="0,0,4,0" VerticalAlignment="Center" Opacity="0.5"/>
-                                <TextBlock Text="Meridian exclusion zone" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="Meridian exclusion zone" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Rectangle Width="12" Height="4" Fill="SlateGray" Margin="0,0,4,0" VerticalAlignment="Center" Opacity="0.5"/>
-                                <TextBlock Text="Custom horizon (below = excluded)" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="Custom horizon (below = excluded)" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Ellipse Width="8" Height="8" Fill="Cyan" Margin="2,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Planned / pending" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="Planned / pending" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Ellipse Width="8" Height="8" Fill="LimeGreen" Margin="2,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Visited &amp; solved" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="Visited &amp; solved" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Ellipse Width="8" Height="8" Fill="Yellow" Margin="2,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="In progress" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="In progress" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Ellipse Width="8" Height="8" Fill="Red" Margin="2,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Failed" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="Failed" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,1">
                                 <Rectangle Width="12" Height="2" Fill="Yellow" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Residual error arrow" FontSize="10" Foreground="Gray"/>
+                                <TextBlock Text="Residual error arrow" FontSize="10" Foreground="{DynamicResource PrimaryBrush}"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -398,7 +403,7 @@
 
             <!-- Residuals chart pinned to the bottom of the left column -->
             <oxy:PlotView Grid.Row="1" Model="{Binding ResidualPlot}" Background="#0a0a1e"
-                          ToolTip="Residuals scatter plot — ΔRA vs ΔDec for all solved points. The dashed circle shows the RMS error radius."/>
+                          ToolTip="Residuals scatter plot — ΔRA vs ΔDec for all solved points; the dashed circle shows the RMS error radius"/>
         </Grid>
 
         <!-- ── Sky chart ─────────────────────────────────────────────────────── -->

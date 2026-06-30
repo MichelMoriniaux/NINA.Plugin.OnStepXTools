@@ -91,7 +91,6 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             _builderMediator.ProgressChanged += OnProgressChanged;
             _builderMediator.BuildCompleted  += OnBuildCompleted;
 
-            GenerateCommand          = new RelayCommand(_ => Generate());
             SavePointsCommand        = new RelayCommand(_ => SavePoints(),      _ => _points.Count > 0);
             LoadPointsCommand        = new RelayCommand(_ => LoadPoints());
             StartBuildCommand        = new RelayCommand(async _ => await StartBuildAsync(),
@@ -103,6 +102,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             SaveModelCommand         = new RelayCommand(_ => SaveModel(),       _ => _coefficients != null);
             LoadModelCommand         = new RelayCommand(_ => LoadModel());
             ForceActivationCommand   = new RelayCommand(async _ => await ForceModelActivationAsync(), _ => _mountConnected);
+
+            Generate();
         }
 
         // ── Point generation options ─────────────────────────────────────────────
@@ -132,9 +133,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     RaisePropertyChanged(nameof(MaxPointCount));
                     RaisePropertyChanged(nameof(TickFrequency));
                     if (value == BuildMode.StarAlignment && Options.PointCount > 9)
-                        Options.PointCount = 9;
+                        PointCount = 9;
                     else if (value == BuildMode.FullSkyPointingModel && Options.PointCount < 10)
-                        Options.PointCount = 50;
+                        PointCount = 50;
                     RaisePropertyChanged(nameof(Options));
                 }
             }
@@ -142,6 +143,18 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         public int    MaxPointCount => _selectedMode == BuildMode.StarAlignment ? 9   : 300;
         public double TickFrequency => _selectedMode == BuildMode.StarAlignment ? 1.0 : 20.0;
+
+        public int PointCount {
+            get => Options.PointCount;
+            set {
+                var next = Math.Clamp(value, 1, MaxPointCount);
+                if (Options.PointCount == next) return;
+                Options.PointCount = next;
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(Options));
+                Generate();
+            }
+        }
 
         public double MeridianExclusionDeg {
             get => _meridianExclusionDeg;
@@ -234,7 +247,6 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // ── Commands ─────────────────────────────────────────────────────────────
 
-        public ICommand GenerateCommand        { get; }
         public ICommand SavePointsCommand      { get; }
         public ICommand LoadPointsCommand      { get; }
         public ICommand StartBuildCommand      { get; }
@@ -584,10 +596,10 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             var model = new PlotModel {
                 Title      = "Residuals",
                 Background = OxyColor.FromRgb(0x0a, 0x0a, 0x1e),
-                TextColor  = OxyColors.LightGray
+                TextColor  = OxyColors.Automatic
             };
-            model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "ΔRA (\")",  TextColor = OxyColors.LightGray });
-            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left,   Title = "ΔDec (\")", TextColor = OxyColors.LightGray });
+            model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "ΔRA (\")",  TextColor = OxyColors.Automatic });
+            model.Axes.Add(new LinearAxis { Position = AxisPosition.Left,   Title = "ΔDec (\")", TextColor = OxyColors.Automatic });
             model.Annotations.Add(new LineAnnotation { Type = LineAnnotationType.Horizontal, Y = 0, Color = OxyColors.DimGray });
             model.Annotations.Add(new LineAnnotation { Type = LineAnnotationType.Vertical,   X = 0, Color = OxyColors.DimGray });
 
@@ -599,7 +611,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
             model.Annotations.Add(new TextAnnotation {
                 Text = $"RMS {rms:F1}\"", TextPosition = new DataPoint(0, 0),
-                TextColor = OxyColors.OrangeRed, FontSize = 10
+                TextColor = OxyColors.Automatic, FontSize = 10
             });
 
             var rmsCircle = new LineSeries { Color = OxyColors.OrangeRed, StrokeThickness = 1, LineStyle = LineStyle.Dash };
@@ -626,7 +638,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             var model = new PlotModel {
                 PlotType            = PlotType.Cartesian,
                 Background          = OxyColor.FromRgb(0x0a, 0x0a, 0x1e),
-                TextColor           = OxyColors.LightGray,
+                TextColor           = OxyColors.Automatic,
                 PlotAreaBorderColor = OxyColors.Transparent
             };
             model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Minimum = -1.1, Maximum = 1.1, IsAxisVisible = false });
@@ -644,7 +656,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     Text         = $"{alt}°",
                     TextPosition = new DataPoint(r * 0.05, r),
                     FontSize     = 9,
-                    TextColor    = OxyColor.FromAColor(100, OxyColors.Gray)
+                    TextColor    = OxyColors.Automatic
                 });
             }
 
@@ -661,7 +673,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                         Text         = cardinals[i],
                         TextPosition = new DataPoint(1.07 * Math.Sin(azRad), 1.07 * Math.Cos(azRad)),
                         FontSize     = 10, FontWeight = FontWeights.Bold,
-                        TextColor    = OxyColors.LightGray
+                        TextColor    = OxyColors.Automatic
                     });
             }
             return model;

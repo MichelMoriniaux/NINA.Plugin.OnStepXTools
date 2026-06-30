@@ -10,6 +10,7 @@ using Microsoft.Win32;
 using Newtonsoft.Json;
 using NINA.Core.Model;
 using NINA.Equipment.Interfaces.Mediator;
+using NINA.Equipment.Interfaces.ViewModel;
 using NINA.PlateSolving.Interfaces;
 using NINA.Profile.Interfaces;
 using NINA.Sequencer.SequenceItem;
@@ -33,6 +34,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
         private readonly IProfileService        _profile;
         private readonly IModelBuilderMediator  _mediator;
         private readonly IWeatherDataMediator   _weather;
+        private readonly IImageControlVM        _imageControl;
         private readonly PointGenerationViewModel? _pointGenVM;
 
         private ObservableCollection<AlignmentPoint> _points = new();
@@ -47,6 +49,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
             IProfileService profile,
             IModelBuilderMediator mediator,
             IWeatherDataMediator weather,
+            IImageControlVM imageControl,
             [Import(AllowDefault = true)] PointGenerationViewModel? pointGenVM) {
             _mount         = mount;
             _telescope     = telescope;
@@ -55,6 +58,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
             _profile       = profile;
             _mediator      = mediator;
             _weather       = weather;
+            _imageControl  = imageControl;
             _pointGenVM    = pointGenVM;
 
             LoadPointsCommand   = new RelayCommand(_ => LoadPoints());
@@ -90,7 +94,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
                 SaveToEepromOnCompletion = SaveToEeprom
             };
 
-            var builder = new ModelBuilder(_mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _weather);
+            var builder = new ModelBuilder(_mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _weather, _imageControl);
             await builder.BuildModelAsync(new List<AlignmentPoint>(_points), opts, progress, token);
         }
 
@@ -117,7 +121,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
         }
 
         public override object Clone() {
-            var clone = new BuildStarAlignment(_mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _weather, _pointGenVM) {
+            var clone = new BuildStarAlignment(_mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _weather, _imageControl, _pointGenVM) {
                 SaveToEeprom = SaveToEeprom,
                 Points       = new ObservableCollection<AlignmentPoint>(_points)
             };
