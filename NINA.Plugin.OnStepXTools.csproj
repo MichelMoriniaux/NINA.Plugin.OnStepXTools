@@ -21,9 +21,12 @@
   </ItemGroup>
 
   <!-- Post-build: deploy DLL to NINA plugins folder -->
+  <PropertyGroup>
+    <PluginFolder>OnStepXTools</PluginFolder>
+  </PropertyGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="if not exist &quot;%25localappdata%25\NINA\Plugins\3.0.0&quot; mkdir &quot;%25localappdata%25\NINA\Plugins\3.0.0&quot;" />
-    <Exec Command="if not exist &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot; mkdir &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot;" />
-    <Exec Command="xcopy &quot;$(TargetPath)&quot; &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(TargetName)&quot; /h/i/c/k/e/r/y" />
+    <Exec Command="if not exist &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(PluginFolder)&quot; mkdir &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(PluginFolder)&quot;" />
+    <Exec Command="xcopy &quot;$(TargetPath)&quot; &quot;%25localappdata%25\NINA\Plugins\3.0.0\$(PluginFolder)&quot; /h/i/c/k/e/r/y" />
   </Target>
 </Project>

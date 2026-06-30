@@ -39,8 +39,10 @@
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,8">
                                 <Button Content="Save Points" Command="{Binding SavePointsCommand}" Width="80" Margin="0,0,6,0"
                                         ToolTip="Export the current point list to a JSON file"/>
-                                <Button Content="Load Points" Command="{Binding LoadPointsCommand}" Width="80"
+                                <Button Content="Load Points" Command="{Binding LoadPointsCommand}" Width="80" Margin="0,0,6,0"
                                         ToolTip="Import a point list from a JSON file"/>
+                                <Button Content="Load Model…" Command="{Binding LoadModelCommand}"
+                                        ToolTip="Load model coefficients from a JSON file"/>
                             </StackPanel>
 
                     <!-- Mode -->
@@ -199,31 +201,6 @@
                         </Border>
                     </Expander>
 
-                    <Expander Header="3: Program Model to Mount" IsExpanded="False"
-                              Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,8"
-                              IsEnabled="{Binding HasModel}"
-                              ToolTip="Available once a pointing model has been built or loaded">
-                        <Border Background="{DynamicResource SecondaryBackgroundBrush}"
-                                BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,4,0,0">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <Button Content="Write to Mount" Command="{Binding WriteToMountCommand}"
-                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
-                                            ToolTip="Upload the loaded pointing model coefficients to the mount controller"/>
-                                    <Button Content="Push to EEPROM" Command="{Binding WriteToEepromCommand}"
-                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
-                                            ToolTip="Write coefficients to the mount and persist them to EEPROM (:AW#)"/>
-                                    <Button Content="Force Activate" Command="{Binding ForceActivationCommand}"
-                                            Padding="4,3" FontSize="11"
-                                            ToolTip="Force the mount to activate the current model (:SX09,2#)"/>
-                                </StackPanel>
-
-                                <TextBlock Text="{Binding BuildStatusMessage}" FontSize="10"
-                                        Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
-                    </Expander>
-
                     <Border Visibility="{Binding HasModel, Converter={StaticResource BoolToVis}}"
                             Background="{DynamicResource SecondaryBackgroundBrush}"
                             BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,0,0,8">
@@ -332,32 +309,57 @@
                                             ToolTip="Number of alignment stars used to compute this model"/>
                                 </StackPanel>
                             </Border>
+                        </StackPanel>
+                    </Border>
 
+                    <Expander Header="3: Program Model to Mount" IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,8"
+                              IsEnabled="{Binding HasModel}"
+                              ToolTip="Available once a pointing model has been built or loaded">
+                        <Border Background="{DynamicResource SecondaryBackgroundBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,4,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Button Content="Write to Mount" Command="{Binding WriteToMountCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Upload the loaded pointing model coefficients to the mount controller"/>
+                                    <Button Content="Push to EEPROM" Command="{Binding WriteToEepromCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Write coefficients to the mount and persist them to EEPROM (:AW#)"/>
+                                    <Button Content="Force Activate" Command="{Binding ForceActivationCommand}"
+                                            Padding="4,3" FontSize="11"
+                                            ToolTip="Force the mount to activate the current model (:SX09,2#)"/>
+                                </StackPanel>
+
+                                <!-- Model file actions -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Button Content="Save Model…" Command="{Binding SaveModelCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Save the current model coefficients to a JSON file"/>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding BuildStatusMessage}" FontSize="10"
+                                        Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Border Visibility="{Binding HasModel, Converter={StaticResource BoolToVis}}"
+                            Background="{DynamicResource SecondaryBackgroundBrush}"
+                            BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,0,0,8">
+                        <StackPanel>
                     <!-- ═══ Arrow scale + model actions ══════════════════════════════ -->
                             <Border Background="{DynamicResource SecondaryBackgroundBrush}"
                                     BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,6,0,0">
-                                <StackPanel>
-                                    <!-- Arrow scale slider -->
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                        <TextBlock Text="Error Arrow scale:" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" Margin="0,0,4,0"
-                                                ToolTip="Multiply the auto-scaled residual error arrow lengths on the sky chart"/>
-                                        <Slider Width="110" Minimum="0.5" Maximum="20" SmallChange="0.5" LargeChange="2"
-                                                Value="{Binding ErrorArrowScale}" VerticalAlignment="Center"
-                                                ToolTip="Drag right to lengthen residual error arrows"/>
-                                        <TextBlock Text="{Binding ErrorArrowScale, StringFormat=' ×{0:F1}'}"
-                                                VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="11"/>
-                                    </StackPanel>
-
-                                    <!-- Model file actions -->
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <Button Content="Save Model…" Command="{Binding SaveModelCommand}"
-                                                Padding="4,3" FontSize="11" Margin="0,0,4,0"
-                                                ToolTip="Save the current model coefficients to a JSON file"/>
-                                        <Button Content="Load Model…" Command="{Binding LoadModelCommand}"
-                                                Padding="4,3" FontSize="11"
-                                                ToolTip="Load model coefficients from a JSON file"/>
-                                    </StackPanel>
-
+                    <!-- Arrow scale slider -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="Error Arrow scale:" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Multiply the auto-scaled residual error arrow lengths on the sky chart"/>
+                                    <Slider Width="110" Minimum="0.5" Maximum="20" SmallChange="0.5" LargeChange="2"
+                                            Value="{Binding ErrorArrowScale}" VerticalAlignment="Center"
+                                            ToolTip="Drag right to lengthen residual error arrows"/>
+                                    <TextBlock Text="{Binding ErrorArrowScale, StringFormat=' ×{0:F1}'}"
+                                            VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" FontSize="11"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
