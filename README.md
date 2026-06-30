@@ -8,7 +8,7 @@ A [N.I.N.A.](https://nighttime-imaging.eu/) 3.x plugin for mount configuration, 
 
 | Feature | Description |
 |---------|-------------|
-| **Mount Status** | Live RA/Dec, Alt/Az, LST, pier side, tracking state, guide rates, site coordinates, weather from OnStepX sensors |
+| **Mount Status** | Live RA/Dec, Alt/Az, LST, pier side, tracking state, guide rates, site coordinates, weather from OnStepX sensors. Can replace the Mount info panel that ships with N.I.N.A. |
 | **Mount Settings** | All runtime mount parameters (tracking, guide rate, backlash, limits, meridian flip, park, buzzer) plus dynamic axis motor config |
 | **Model Builder** | Point generation, live build, real-time sky chart, residual scatter plot, and coefficient management — all in one panel |
 | **Full-Sky Pointing Model** | Sequencer item — plate-solve based all-sky model; 12-parameter least-squares solver; resumable sessions |
@@ -41,7 +41,7 @@ dotnet build
 The post-build step automatically copies the DLL to:
 
 ```
-%LOCALAPPDATA%\NINA\Plugins\3.0.0\NINA.Plugin.OnStepXTools\NINA.Plugin.OnStepXTools.dll
+%LOCALAPPDATA%\NINA\Plugins\3.0.0\OnStepXTools\NINA.Plugin.OnStepXTools.dll
 ```
 
 Restart NINA; the plugin will appear under **Options → Plugins**.

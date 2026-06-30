@@ -120,6 +120,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     Options.Method = value;
                     RaisePropertyChanged(nameof(IsSiderealPath));
                 }
+                Generate();
             }
         }
 
@@ -222,8 +223,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // ── Build settings (exposed to UI) ───────────────────────────────────────
 
-        private double _exposureTimeSec  = 5.0;
-        private double _settleTimeSec    = 3.0;
+        private double _exposureTimeSec  = new ModelBuilderOptions().ExposureTimeSeconds;
+        private double _settleTimeSec    = new ModelBuilderOptions().SlewSettleSeconds;
 
         public double ExposureTimeSec {
             get => _exposureTimeSec;
@@ -416,8 +417,17 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private void LoadModel() {
             var dlg = new OpenFileDialog { Filter = "JSON|*.json", Title = "Load Model" };
             if (dlg.ShowDialog() != true) return;
-            try { Coefficients = JsonConvert.DeserializeObject<AlignmentModelCoefficients>(File.ReadAllText(dlg.FileName)); }
-            catch { }
+            try {
+                var loaded = JsonConvert.DeserializeObject<AlignmentModelCoefficients>(File.ReadAllText(dlg.FileName));
+                if (loaded != null) {
+                    Coefficients       = loaded;
+                    BuildStatusMessage = $"Model loaded — {loaded.Stars} stars.";
+                } else {
+                    BuildStatusMessage = "File did not contain a valid model.";
+                }
+            } catch (Exception ex) {
+                BuildStatusMessage = $"Load failed: {ex.Message}";
+            }
         }
 
         private async Task ForceModelActivationAsync() {
@@ -596,7 +606,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             var model = new PlotModel {
                 Title      = "Residuals",
                 Background = OxyColor.FromRgb(0x0a, 0x0a, 0x1e),
-                TextColor  = OxyColors.Automatic
+                TextColor  = OxyColors.LightGray
             };
             model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "ΔRA (\")",  TextColor = OxyColors.Automatic });
             model.Axes.Add(new LinearAxis { Position = AxisPosition.Left,   Title = "ΔDec (\")", TextColor = OxyColors.Automatic });
@@ -638,7 +648,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             var model = new PlotModel {
                 PlotType            = PlotType.Cartesian,
                 Background          = OxyColor.FromRgb(0x0a, 0x0a, 0x1e),
-                TextColor           = OxyColors.Automatic,
+                TextColor           = OxyColors.LightGray,
                 PlotAreaBorderColor = OxyColors.Transparent
             };
             model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Minimum = -1.1, Maximum = 1.1, IsAxisVisible = false });
