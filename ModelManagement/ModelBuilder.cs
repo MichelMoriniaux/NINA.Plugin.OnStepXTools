@@ -7,6 +7,7 @@ using NINA.Astrometry;
 using NINA.Core.Model;
 using NINA.Core.Utility;
 using NINA.Equipment.Interfaces.Mediator;
+using NINA.Equipment.Interfaces.ViewModel;
 using NINA.Equipment.Model;
 using NINA.Image.Interfaces;
 using NINA.PlateSolving;
@@ -28,6 +29,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         private readonly IProfileService        _profile;
         private readonly IModelBuilderMediator  _mediator;
         private readonly IWeatherDataMediator   _weather;
+        private readonly IImageControlVM        _imageControl;
         private readonly ModelBuildSessionStore _store = new();
 
         [ImportingConstructor]
@@ -38,7 +40,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             IPlateSolverFactory solverFactory,
             IProfileService profile,
             IModelBuilderMediator mediator,
-            IWeatherDataMediator weather) {
+            IWeatherDataMediator weather,
+            IImageControlVM imageControl) {
             _mount         = mount;
             _telescope     = telescope;
             _imaging       = imaging;
@@ -46,6 +49,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             _profile       = profile;
             _mediator      = mediator;
             _weather       = weather;
+            _imageControl  = imageControl;
         }
 
         public async Task<AlignmentModelCoefficients?> BuildModelAsync(
@@ -162,15 +166,33 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             //    Refraction corrects geometric → apparent altitude so the mount receives
             //    the apparent (observed) RA/Dec that its ASCOM driver expects.
             var info = _telescope.GetInfo();
+            var siteLatitude = IsFinite(info.SiteLatitude)
+                ? info.SiteLatitude
+                : _profile.ActiveProfile.AstrometrySettings.Latitude;
+            var siderealTime = info.SiderealTime;
+            if (!IsFinite(siteLatitude) || siteLatitude < -90.0 || siteLatitude > 90.0) {
+                throw new InvalidOperationException($"Mount/profile reported invalid site latitude: {siteLatitude}");
+            }
+            if (!IsFinite(siderealTime)) {
+                throw new InvalidOperationException($"Mount reported invalid sidereal time: {siderealTime}");
+            }
+
             GetWeatherForRefraction(out double pressureMbar, out double temperatureCelsius,
                                     info.SiteElevation);
             var coords = AltAzToEquatorial(
                 point.AltitudeDeg, point.AzimuthDeg,
-                info.SiteLatitude, info.SiderealTime,
+                siteLatitude, siderealTime,
                 pressureMbar, temperatureCelsius);
 
             point.TargetRAHours  = coords.RADegrees / 15.0;
             point.TargetDecDeg   = coords.Dec;
+            if (!IsFinite(point.TargetRAHours) || !IsFinite(point.TargetDecDeg)) {
+                throw new InvalidOperationException(
+                    $"Computed invalid target coordinates for point {point.Index}: " +
+                    $"Alt={point.AltitudeDeg:F1}, Az={point.AzimuthDeg:F1}, " +
+                    $"Lat={siteLatitude:F4}, LST={siderealTime:F4}, " +
+                    $"Pressure={pressureMbar:F1}, Temp={temperatureCelsius:F1}");
+            }
 
             // 2. Slew
             point.State = AlignmentPointState.Slewing;
@@ -199,6 +221,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             };
             var exposure = await _imaging.CaptureImage(captureSeq, ct, progress);
             var imageData = await exposure.ToImageData(progress, ct);
+            await ShowCapturedImageAsync(imageData, ct);
 
             // 6. Plate solve - use NINA's configured solver with full profile parameters
             point.State = AlignmentPointState.PlateSolving;
@@ -265,6 +288,24 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             point.State = AlignmentPointState.Added;
         }
 
+        private async Task ShowCapturedImageAsync(IImageData imageData, CancellationToken ct) {
+            try {
+                var render = await _imageControl.PrepareImage(
+                    imageData,
+                    new PrepareImageParameters(autoStretch: true, detectStars: false),
+                    ct);
+                _imageControl.RenderedImage = render;
+                _imageControl.Image = render.Image;
+                _imageControl.Status = new ApplicationStatus {
+                    Status = "OnStepX model plate-solve image"
+                };
+            } catch (OperationCanceledException) {
+                throw;
+            } catch (Exception ex) {
+                Logger.Warning($"Failed to show OnStepX model image in Image window: {ex.Message}");
+            }
+        }
+
         private static SavedModelPoint ToSavedPoint(AlignmentPoint p) => new() {
             Index                    = p.Index,
             AltitudeDeg              = p.AltitudeDeg,
@@ -288,6 +329,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             double siteElevationM) {
 
             // Source 3 — standard atmosphere fallback (ISA sea-level → elevation)
+            if (!IsFinite(siteElevationM)) siteElevationM = 0.0;
             pressureMbar       = 1013.25 * Math.Pow(1.0 - 2.25577e-5 * siteElevationM, 5.25588);
             temperatureCelsius = 10.0;
 
@@ -301,14 +343,16 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 if (!string.IsNullOrWhiteSpace(tStr) &&
                     double.TryParse(tStr.TrimEnd('#').Trim(),
                         System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out var t)) {
+                        System.Globalization.CultureInfo.InvariantCulture, out var t) &&
+                    IsFinite(t) && t > -100.0 && t < 80.0) {
                     temperatureCelsius = t;
                     haveTemp = true;
                 }
                 if (!string.IsNullOrWhiteSpace(pStr) &&
                     double.TryParse(pStr.TrimEnd('#').Trim(),
                         System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out var p) && p > 0) {
+                        System.Globalization.CultureInfo.InvariantCulture, out var p) &&
+                    IsFinite(p) && p > 0) {
                     pressureMbar = p;
                     havePress = true;
                 }
@@ -320,10 +364,20 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             try {
                 var wx = _weather.GetInfo();
                 if (wx.Connected) {
-                    if (!haveTemp && !double.IsNaN(wx.Temperature))  { temperatureCelsius = wx.Temperature;  haveTemp  = true; }
-                    if (!havePress && !double.IsNaN(wx.Pressure) && wx.Pressure > 0) { pressureMbar = wx.Pressure; havePress = true; }
+                    if (!haveTemp && IsFinite(wx.Temperature) && wx.Temperature > -100.0 && wx.Temperature < 80.0) {
+                        temperatureCelsius = wx.Temperature;
+                        haveTemp = true;
+                    }
+                    if (!havePress && IsFinite(wx.Pressure) && wx.Pressure > 0) {
+                        pressureMbar = wx.Pressure;
+                        havePress = true;
+                    }
                 }
             } catch { /* fall through to standard atmosphere */ }
+
+            if (!IsFinite(pressureMbar) || pressureMbar <= 0) pressureMbar = 1013.25;
+            if (!IsFinite(temperatureCelsius) || temperatureCelsius <= -100.0 || temperatureCelsius >= 80.0)
+                temperatureCelsius = 10.0;
 
             if (!haveTemp || !havePress)
                 Logger.Debug($"OnStepX refraction: using standard atmosphere " +
@@ -341,6 +395,11 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         private static Coordinates AltAzToEquatorial(
             double altDeg, double azDeg, double latDeg, double lstHours,
             double pressureMbar = 1013.25, double temperatureCelsius = 10.0) {
+
+            if (!IsFinite(altDeg) || !IsFinite(azDeg) || !IsFinite(latDeg) || !IsFinite(lstHours)) {
+                throw new InvalidOperationException(
+                    $"Invalid Alt/Az conversion input: Alt={altDeg}, Az={azDeg}, Lat={latDeg}, LST={lstHours}");
+            }
 
             // Geometric → apparent altitude (atmospheric refraction)
             double apparentAltDeg = ApplyRefraction(altDeg, pressureMbar, temperatureCelsius);
@@ -361,6 +420,13 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             double raHours = (lstHours - haHours) % 24.0;
             if (raHours < 0.0) raHours += 24.0;
 
+            if (!IsFinite(raHours) || !IsFinite(decRad)) {
+                throw new InvalidOperationException(
+                    $"Invalid Alt/Az conversion result: RA={raHours}, DecRad={decRad}, " +
+                    $"Alt={altDeg}, Az={azDeg}, Lat={latDeg}, LST={lstHours}, " +
+                    $"Pressure={pressureMbar}, Temp={temperatureCelsius}");
+            }
+
             return new Coordinates(raHours, decRad * 180.0 / Math.PI, Epoch.JNOW, Coordinates.RAType.Hours);
         }
 
@@ -373,6 +439,11 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             double geometricAltDeg,
             double pressureMbar      = 1013.25,
             double temperatureCelsius = 10.0) {
+
+            if (!IsFinite(geometricAltDeg)) return geometricAltDeg;
+            if (!IsFinite(pressureMbar) || pressureMbar <= 0) pressureMbar = 1013.25;
+            if (!IsFinite(temperatureCelsius) || temperatureCelsius <= -100.0 || temperatureCelsius >= 80.0)
+                temperatureCelsius = 10.0;
 
             if (geometricAltDeg < -1.0) return geometricAltDeg;
 
@@ -388,5 +459,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             // R is in arcminutes; convert to degrees and add to geometric altitude
             return geometricAltDeg + R / 60.0;
         }
+
+        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }
 }
