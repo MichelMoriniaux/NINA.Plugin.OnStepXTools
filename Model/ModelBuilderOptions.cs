@@ -2,7 +2,7 @@ namespace NINA.Plugin.OnStepXTools.Model {
 
     public class ModelBuilderOptions {
         public BuildMode Mode { get; set; } = BuildMode.FullSkyPointingModel;
-        public double ExposureTimeSeconds { get; set; } = 5.0;
+        public double ExposureTimeSeconds { get; set; } = 2.0;
         public double SlewSettleSeconds { get; set; } = 3.0;
         // Pre-model outlier rejection: only discard plate solves where the error
         // exceeds 3 × this value.  Setting it to 3600" (1°) means we reject solves

@@ -150,7 +150,7 @@ A **Build Settings** section below the generator allows running a build directly
 
 - **Exposure** — capture duration per pointing star (seconds)
 - **Settle** — wait time after each slew (seconds)
-- **▶ Start Build** — initiates the build using the current point list; requires telescope connected
+- **▶ Start Build** — initiates the build using the current point list; requires both telescope and camera connected
 - **■ Cancel** — aborts after the current point completes
 
 The build uses the same `ModelBuilder` pipeline as the sequencer items, so session persistence, progress events, and mediator notifications all work identically.
@@ -275,11 +275,17 @@ Reads a `.json` coefficient file (saved by any build) and writes all 12 paramete
 
 ## Atmospheric Refraction
 
-When computing the slew target (Alt/Az → apparent RA/Dec), the plugin applies atmospheric refraction using:
+When computing the slew target (Alt/Az → apparent RA/Dec), the plugin applies atmospheric refraction using **Bennett's formula** (accurate to ~0.07' for altitudes above 5°) with the **Stone 1996** pressure/temperature correction.
 
-- **Bennett's formula** (accurate to ~0.07' for altitudes above 5°)
-- **Pressure/temperature correction** (Stone 1996)
-- Barometric pressure estimated from site elevation via ISA formula, overridden by actual mount sensor value if available (`:GX9B#`, `:GX9A#`)
+Temperature and pressure are read from three sources in priority order:
+
+| Priority | Source | How |
+|----------|--------|-----|
+| 1 — highest | **OnStepX mount sensors** | `:GX9A#` (temperature), `:GX9B#` (pressure) |
+| 2 | **NINA weather device** | `IWeatherDataMediator.GetInfo()` — any weather station connected in NINA |
+| 3 — fallback | **Standard atmosphere** | ISA barometric formula: `P = 1013.25 × (1 − 2.256×10⁻⁵ × elev)^5.256`, T = 10°C |
+
+Each source is tried only for the values the previous source failed to provide. If the mount has a temperature sensor but no pressure sensor, the pressure falls through to the NINA weather device (or standard atmosphere if that is also unavailable).
 
 This ensures the mount receives apparent (observed) coordinates as its ASCOM driver expects.
 

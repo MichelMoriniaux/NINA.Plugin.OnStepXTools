@@ -14,7 +14,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="8">
 
-            <!-- ── Toolbar ────────────────────────────────────────────────────── -->
+            <!-- ── Toolbar (full width) ──────────────────────────────────────── -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                 <Button Content="↻  Read All Settings" Command="{Binding LoadCommand}"
                         Padding="8,3" FontWeight="Bold"
@@ -23,412 +23,424 @@
                            Margin="12,0,0,0" Foreground="{DynamicResource PrimaryBrush}"/>
             </StackPanel>
 
-            <!-- ── Site Location ─────────────────────────────────────────────── -->
-            <GroupBox Header="Site Location" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4">
-                <StackPanel Margin="6,4">
-                    <!-- Single sync button -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <Button Content="Sync Site from N.I.N.A."
-                                Command="{Binding SyncSiteFromNinaCommand}"
-                                Padding="8,3"
-                                ToolTip="Upload latitude and longitude from N.I.N.A.'s configured site (Options → Astrometry) to the mount (:St# :Sg#)"/>
-                    </StackPanel>
+            <!-- ── Two-column body ───────────────────────────────────────────── -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                    <!-- Read-only display of what the mount currently reports -->
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Mount latitude:"  Width="100" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding LatitudeDMS}"  FontFamily="Courier New" Margin="4,0,16,0"
-                                   Foreground="{DynamicResource PrimaryBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Mount longitude:" Width="110" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding LongitudeDMS}" FontFamily="Courier New" Margin="4,0,0,0"
-                                   Foreground="{DynamicResource PrimaryBrush}" VerticalAlignment="Center"/>
-                    </StackPanel>
+                <!-- ══ LEFT COLUMN — operational settings ════════════════════════ -->
+                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+
+                    <!-- Site Location -->
+                    <GroupBox Header="Site Location" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4">
+                        <StackPanel Margin="6,4">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Button Content="Sync Site from N.I.N.A."
+                                        Command="{Binding SyncSiteFromNinaCommand}"
+                                        Padding="8,3"
+                                        ToolTip="Upload latitude and longitude from N.I.N.A.'s configured site (Options → Astrometry) to the mount (:St# :Sg#)"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="Lat:" Width="28" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding LatitudeDMS}" FontFamily="Courier New" Margin="2,0,10,0"
+                                           Foreground="{DynamicResource PrimaryBrush}" VerticalAlignment="Center" FontSize="11"/>
+                                <TextBlock Text="Lon:" Width="28" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding LongitudeDMS}" FontFamily="Courier New" Margin="2,0,0,0"
+                                           Foreground="{DynamicResource PrimaryBrush}" VerticalAlignment="Center" FontSize="11"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Tracking -->
+                    <GroupBox Header="Tracking" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Tracking state, rate and frequency fine-tune">
+                        <StackPanel Margin="6,4">
+
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="State:" Width="90" VerticalAlignment="Center"/>
+                                <Button Content="ON"  Command="{Binding TrackOnCommand}"  Width="50" Margin="0,0,4,0"
+                                        Background="#1a3a1a" ToolTip="Enable sky tracking (:Te#)"/>
+                                <Button Content="OFF" Command="{Binding TrackOffCommand}" Width="50"
+                                        Background="#3a1a1a" ToolTip="Disable sky tracking (:Td#)"/>
+                                <TextBlock Text="{Binding TrackingEnabled, StringFormat='  {0}'}"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" Margin="6,0,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Rate:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="Sidereal = stars, Lunar = Moon, Solar = Sun, King = refraction-corrected sidereal"/>
+                                <ComboBox Width="110" SelectedValue="{Binding TrackingRate}" SelectedValuePath="Tag" Margin="0,0,6,0"
+                                          ToolTip="Sidereal (15.04°/h), Lunar (14.51°/h), Solar (15.00°/h), King (refraction-corrected)">
+                                    <ComboBoxItem Tag="{x:Static model:TrackingRate.Sidereal}">Sidereal</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:TrackingRate.Lunar}">Lunar</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:TrackingRate.Solar}">Solar</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:TrackingRate.King}">King</ComboBoxItem>
+                                </ComboBox>
+                                <Button Content="Set" Command="{Binding SetTrackRateCommand}" Width="50"
+                                        ToolTip="Apply the selected tracking rate (:TQ# / :TL# / :TS# / :TK#)"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Compensation:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="Atmospheric refraction compensation applied to the tracking rate"/>
+                                <ComboBox Width="150" SelectedValue="{Binding CompensatedTracking}" SelectedValuePath="Tag" Margin="0,0,6,0"
+                                          ToolTip="Off = no compensation. Refraction Only = corrects atmospheric bending. Full = refraction + model.">
+                                    <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Off}">Off</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:CompensatedTracking.RefractionOnly}">Refraction only</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full</ComboBoxItem>
+                                </ComboBox>
+                                <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
+                                        ToolTip="Apply compensation mode (:Tn# / :T1# / :T2#)"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Freq. Adjust:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="Fine-tune base tracking frequency by ±0.02 Hz"/>
+                                <Button Content="+0.02 Hz" Command="{Binding FreqPlusCommand}"  Width="72" Margin="0,0,4,0"
+                                        ToolTip="Increase tracking frequency by 0.02 Hz (:T+#)"/>
+                                <Button Content="−0.02 Hz" Command="{Binding FreqMinusCommand}" Width="72" Margin="0,0,4,0"
+                                        ToolTip="Decrease tracking frequency by 0.02 Hz (:T-#)"/>
+                                <Button Content="Reset"    Command="{Binding FreqResetCommand}" Width="50"
+                                        ToolTip="Reset to default tracking frequency (:TR#)"/>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Guide Rate & Slew Speed -->
+                    <GroupBox Header="Guide Rate &amp; Slew Speed" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Guide rate used by the guider, and maximum slew speed for goto operations">
+                        <StackPanel Margin="6,4">
+
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="Guide Rate:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="Pulse-guide rate as a fraction of sidereal"/>
+                                <ComboBox Width="90" SelectedIndex="{Binding GuideRateIndex}" Margin="0,0,6,0"
+                                          ItemsSource="{x:Static local:MountSettingsViewModel.GuideRateNames}"
+                                          xmlns:local="clr-namespace:NINA.Plugin.OnStepXTools.ViewModels"
+                                          ToolTip="Index 2 (1×) = sidereal guide rate, suitable for most setups"/>
+                                <Button Content="Set" Command="{Binding SetGuideRateCommand}" Width="50"
+                                        ToolTip="Apply the selected guide rate (:R0# through :R9#)"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,6">
+                                <TextBlock Text="Slew Speed:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="Maximum speed for goto slews"/>
+                                <ComboBox Width="90" SelectedValue="{Binding SlewSpeed}" SelectedValuePath="Tag" Margin="0,0,6,0"
+                                          ToolTip="V.Fast = fastest possible slew. V.Slow = most accurate for short moves.">
+                                    <ComboBoxItem Tag="{x:Static model:SlewSpeed.VFast}">V.Fast</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:SlewSpeed.Fast}">Fast</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:SlewSpeed.Normal}">Normal</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:SlewSpeed.Slow}">Slow</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:SlewSpeed.VSlow}">V.Slow</ComboBoxItem>
+                                </ComboBox>
+                                <Button Content="Set" Command="{Binding SetSlewSpeedCommand}" Width="50"
+                                        ToolTip="Apply the selected slew speed (:RS0# through :RS4#)"/>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Meridian Flip & Park -->
+                    <GroupBox Header="Meridian Flip &amp; Park" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="GEM meridian flip behaviour and park position settings">
+                        <StackPanel Margin="6,4">
+
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="Auto flip at limit:" Width="160" VerticalAlignment="Center"
+                                           ToolTip="Automatically flip to the other pier side at the meridian limit (:SXE6,n#)"/>
+                                <CheckBox IsChecked="{Binding AutoMeridianFlip}" VerticalAlignment="Center"
+                                          ToolTip="Enable automatic meridian flip"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Pause at home:" Width="160" VerticalAlignment="Center"
+                                           ToolTip="Pause at home switch during meridian flip (:SXE7,n#)"/>
+                                <CheckBox IsChecked="{Binding PauseAtHome}" VerticalAlignment="Center"
+                                          ToolTip="Pause at home index position before continuing"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Goto buzzer:" Width="160" VerticalAlignment="Center"
+                                           ToolTip="Play a beep when a goto slew completes (:SXE5,n#)"/>
+                                <CheckBox IsChecked="{Binding BuzzerEnabled}" VerticalAlignment="Center"
+                                          ToolTip="Enable the audible alert at end of goto"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Preferred pier side:" Width="160" VerticalAlignment="Center"
+                                           ToolTip="Which pier side to prefer after a meridian flip (:SXE8,n#)"/>
+                                <ComboBox Width="80" SelectedValue="{Binding PreferredPierSide}" SelectedValuePath="Tag"
+                                          ToolTip="Best = firmware decides. East/West = always flip to that side.">
+                                    <ComboBoxItem Tag="{x:Static model:PreferredPierSide.Best}">Best</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:PreferredPierSide.West}">West</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:PreferredPierSide.East}">East</ComboBoxItem>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <WrapPanel Margin="0,8,0,0">
+                                <Button Content="Apply Meridian Settings"
+                                        Command="{Binding SetMeridianSettingsCommand}"
+                                        Padding="6,3" Margin="0,0,6,0"
+                                        ToolTip="Write all four meridian/buzzer settings to the mount (:SXE5–8#)"/>
+                                <Button Content="Trigger Flip Now"
+                                        Command="{Binding TriggerMeridianFlipCommand}"
+                                        Padding="6,3" Foreground="Orange" Margin="0,0,6,0"
+                                        ToolTip="Force a meridian flip immediately — mount slews to the opposite pier side (:Mf#)"/>
+                                <Button Content="Set Park Position"
+                                        Command="{Binding SetParkCommand}"
+                                        Padding="6,3"
+                                        ToolTip="Save the current mount position as the park position (:hQ#)"/>
+                            </WrapPanel>
+
+                        </StackPanel>
+                    </GroupBox>
+
                 </StackPanel>
-            </GroupBox>
 
-            <!-- ── Tracking ──────────────────────────────────────────────────── -->
-            <GroupBox Header="Tracking" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
-                      ToolTip="Tracking state, rate and frequency fine-tune">
-                <StackPanel Margin="6,4">
+                <!-- ══ RIGHT COLUMN — hardware / axis settings ════════════════════ -->
+                <StackPanel Grid.Column="1" Margin="4,0,0,0">
 
-                    <!-- On/Off -->
-                    <StackPanel Orientation="Horizontal" Margin="0,2">
-                        <TextBlock Text="State:" Width="100" VerticalAlignment="Center"/>
-                        <Button Content="Tracking ON"  Command="{Binding TrackOnCommand}"  Width="100" Margin="0,0,6,0"
-                                ToolTip="Enable sky tracking (:Te#)"
-                                Background="#1a3a1a"/>
-                        <Button Content="Tracking OFF" Command="{Binding TrackOffCommand}" Width="100"
-                                Background="#3a1a1a" ToolTip="Disable sky tracking (:Td#) - mount stops following the sky"/>
-                        <TextBlock Text="{Binding TrackingEnabled, StringFormat='  Currently: {0}'}"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource PrimaryBrush}" Margin="8,0,0,0"/>
-                    </StackPanel>
+                    <!-- Backlash -->
+                    <GroupBox Header="Backlash (arcseconds)" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Gear backlash compensation during direction reversals. 0 = disabled.">
+                        <Grid Margin="6,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                    <!-- Rate selection -->
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="Tracking Rate:" Width="100" VerticalAlignment="Center"
-                                   ToolTip="Select the tracking rate. Sidereal = stars, Lunar = Moon, Solar = Sun, King = refraction-corrected sidereal."/>
-                        <ComboBox Width="110" SelectedValue="{Binding TrackingRate}" SelectedValuePath="Tag" Margin="0,0,6,0"
-                                  ToolTip="Sidereal (15.04°/h), Lunar (14.51°/h), Solar (15.00°/h), King (refraction-corrected sidereal)">
-                            <ComboBoxItem Tag="{x:Static model:TrackingRate.Sidereal}">Sidereal</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:TrackingRate.Lunar}">Lunar</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:TrackingRate.Solar}">Solar</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:TrackingRate.King}">King</ComboBoxItem>
-                        </ComboBox>
-                        <Button Content="Set Rate" Command="{Binding SetTrackRateCommand}" Width="80"
-                                ToolTip="Apply the selected tracking rate to the mount (:TQ# / :TL# / :TS# / :TK#)"/>
-                    </StackPanel>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Axis 1 — RA / Az:" Margin="0,2,8,2" VerticalAlignment="Center"
+                                       ToolTip="Backlash on the RA/Azimuth axis (read via :%BR#)"/>
+                            <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding BacklashAxis1Arcsec, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
+                                       ToolTip="Backlash in arcseconds (0–3600)"/>
 
-                    <!-- Rate compensation -->
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="Compensation:" Width="100" VerticalAlignment="Center"
-                                   ToolTip="Atmospheric refraction compensation applied to the tracking rate"/>
-                        <ComboBox Width="160" SelectedValue="{Binding CompensatedTracking}" SelectedValuePath="Tag" Margin="0,0,6,0"
-                                  ToolTip="Off = no compensation. Refraction Only = corrects for atmospheric bending. Full = refraction + pointing model correction.">
-                            <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Off}">Off</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:CompensatedTracking.RefractionOnly}">Refraction Only</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full (refraction + model)</ComboBoxItem>
-                        </ComboBox>
-                        <Button Content="Set Comp." Command="{Binding SetCompTrackCommand}" Width="80"
-                                ToolTip="Apply the selected compensation mode (:Tn# / :T1# / :T2#)"/>
-                    </StackPanel>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Axis 2 — Dec / Alt:" Margin="0,2,8,2" VerticalAlignment="Center"
+                                       ToolTip="Backlash on the Dec/Altitude axis (read via :%BD#)"/>
+                            <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding BacklashAxis2Arcsec, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
+                                       ToolTip="Backlash in arcseconds (0–3600)"/>
 
-                    <!-- Frequency adjust -->
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="Freq. Adjust:" Width="100" VerticalAlignment="Center"
-                                   ToolTip="Fine-tune the base tracking frequency by ±0.02 Hz. Use to correct systematic drift."/>
-                        <Button Content="+ 0.02 Hz" Command="{Binding FreqPlusCommand}"  Width="90" Margin="0,0,6,0"
-                                ToolTip="Increase tracking frequency by 0.02 Hz (:T+#)"/>
-                        <Button Content="− 0.02 Hz" Command="{Binding FreqMinusCommand}" Width="90" Margin="0,0,6,0"
-                                ToolTip="Decrease tracking frequency by 0.02 Hz (:T-#)"/>
-                        <Button Content="Reset"     Command="{Binding FreqResetCommand}" Width="60"
-                                ToolTip="Reset tracking frequency to the default value (:TR#)"/>
-                    </StackPanel>
+                            <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
+                                    Content="Set Backlash" Command="{Binding SetBacklashCommand}"
+                                    HorizontalAlignment="Left" Padding="8,3" Margin="0,6,0,0"
+                                    ToolTip="Write both backlash values to the mount (:$BRn# / :$BDn#)"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Limits -->
+                    <GroupBox Header="Limits" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Movement limits that prevent the mount from pointing into unsafe zones">
+                        <Grid Margin="6,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="65"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Min altitude (°):" Margin="0,2,8,2" VerticalAlignment="Center"
+                                       ToolTip="Minimum altitude for goto commands (:Gh# / :Sh#)"/>
+                            <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding LimitMinAltDeg, StringFormat='{}{0:F0}', UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
+                                       ToolTip="Minimum altitude in degrees (−30 to +30)"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Max altitude (°):" Margin="0,2,8,2" VerticalAlignment="Center"
+                                       ToolTip="Maximum altitude for goto commands (:Go# / :So#)"/>
+                            <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding LimitMaxAltDeg, StringFormat='{}{0:F0}', UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
+                                       ToolTip="Maximum altitude in degrees (60–90)"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Past meridian East (°):" Margin="0,6,8,2" VerticalAlignment="Center" FontSize="11"
+                                       ToolTip="How far East of meridian the mount may track before a flip is required (:GXE9#)"/>
+                            <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding LimitEastPastMeridian, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,2"
+                                       ToolTip="Degrees East past meridian (0–270°)"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Past meridian West (°):" Margin="0,2,8,2" VerticalAlignment="Center" FontSize="11"
+                                       ToolTip="How far West of meridian the mount may track before stopping (:GXEA#)"/>
+                            <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding LimitWestPastMeridian, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
+                                       ToolTip="Degrees West past meridian (0–270°)"/>
+
+                            <Button Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"
+                                    Content="Set All Limits" Command="{Binding SetLimitsCommand}"
+                                    HorizontalAlignment="Left" Padding="8,3" Margin="0,6,0,0"
+                                    ToolTip="Write all four limit values to the mount (:Sh# :So# :SXE9# :SXEA#)"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Mount Type & Controller -->
+                    <GroupBox Header="Mount Type &amp; Controller" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
+                              ToolTip="Mount geometry and controller reset">
+                        <StackPanel Margin="6,4">
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="Mount type:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="GEM=0, EQ Fork=1, Alt/Az=2. Reboot required after change."/>
+                                <ComboBox Width="100" SelectedValue="{Binding MountType}" SelectedValuePath="Tag" Margin="0,0,6,0"
+                                          ToolTip="Select the mount geometry. Reboot required after changing.">
+                                    <ComboBoxItem Tag="{x:Static model:MountType.GEM}">GEM</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:MountType.EQFork}">EQ Fork</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:MountType.AltAz}">Alt/Az</ComboBoxItem>
+                                </ComboBox>
+                                <Button Content="Set" Command="{Binding SetMountTypeCommand}" Padding="6,2"
+                                        ToolTip="Send :SXEM,n# — reboot required for change to take effect"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,6">
+                                <Button Content="Reboot Controller" Command="{Binding RebootCommand}"
+                                        Foreground="OrangeRed" Padding="6,2" Margin="0,0,8,0"
+                                        ToolTip="Send :ERESET# — mount will disconnect and reconnect"/>
+                                <TextBlock Text="⚠ Mount will disconnect" VerticalAlignment="Center"
+                                           Foreground="Orange" FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Axis 1 -->
+                    <GroupBox Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Axis 1 — RA / Az   " FontWeight="Bold"/>
+                                <TextBlock Text="{Binding Axis1DriverId}" Foreground="CornflowerBlue" FontStyle="Italic"/>
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <StackPanel Margin="4,2">
+                            <ItemsControl ItemsSource="{Binding Axis1Params}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type model:AxisParameter}">
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="NoWrap">
+                                                <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                <Run Text="{Binding RangeHint, Mode=OneWay}" Foreground="Gray" FontSize="10"/>
+                                                <Run Text="{Binding ImmediateHint, Mode=OneWay}" Foreground="DarkSeaGreen" FontSize="10"/>
+                                            </TextBlock>
+                                            <CheckBox Grid.Column="1"
+                                                      Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
+                                                      VerticalAlignment="Center" Margin="4,0"
+                                                      IsChecked="{Binding EditValue, Converter={StaticResource BoolStringConverter}}"/>
+                                            <TextBox Grid.Column="1"
+                                                     Visibility="{Binding IsBoolean, Converter={StaticResource InvBoolToVis}}"
+                                                     Text="{Binding EditValue, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Courier New" Margin="4,0"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding CurrentValue, StringFormat='now: {0}'}"
+                                                       VerticalAlignment="Center" Foreground="Gray" FontSize="10" Margin="4,0"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Visibility="{Binding Axis1Params.Count, Converter={StaticResource ZeroToVis}}"
+                                       Text="No runtime-configurable parameters (:GXA returned 0)."
+                                       Foreground="Gray" FontStyle="Italic" FontSize="10" Margin="4,4" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,6">
+                                <Button Content="Save Axis 1" Command="{Binding SaveAxis1Command}"
+                                        Padding="6,3" Margin="0,0,8,0"
+                                        ToolTip="Write changed Axis 1 parameters to the mount (:SXA1,n,v#)"/>
+                                <Button Content="Revert Defaults" Command="{Binding RevertAxis1Command}"
+                                        Padding="6,3" Foreground="Orange"
+                                        ToolTip="Reset Axis 1 parameters to firmware defaults (:SXA1,R#)"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Axis 2 -->
+                    <GroupBox Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Axis 2 — Dec / Alt   " FontWeight="Bold"/>
+                                <TextBlock Text="{Binding Axis2DriverId}" Foreground="CornflowerBlue" FontStyle="Italic"/>
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <StackPanel Margin="4,2">
+                            <ItemsControl ItemsSource="{Binding Axis2Params}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type model:AxisParameter}">
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="NoWrap">
+                                                <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                <Run Text="{Binding RangeHint, Mode=OneWay}" Foreground="Gray" FontSize="10"/>
+                                                <Run Text="{Binding ImmediateHint, Mode=OneWay}" Foreground="DarkSeaGreen" FontSize="10"/>
+                                            </TextBlock>
+                                            <CheckBox Grid.Column="1"
+                                                      Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
+                                                      VerticalAlignment="Center" Margin="4,0"
+                                                      IsChecked="{Binding EditValue, Converter={StaticResource BoolStringConverter}}"/>
+                                            <TextBox Grid.Column="1"
+                                                     Visibility="{Binding IsBoolean, Converter={StaticResource InvBoolToVis}}"
+                                                     Text="{Binding EditValue, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="Courier New" Margin="4,0"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding CurrentValue, StringFormat='now: {0}'}"
+                                                       VerticalAlignment="Center" Foreground="Gray" FontSize="10" Margin="4,0"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Visibility="{Binding Axis2Params.Count, Converter={StaticResource ZeroToVis}}"
+                                       Text="No runtime-configurable parameters (:GXA returned 0)."
+                                       Foreground="Gray" FontStyle="Italic" FontSize="10" Margin="4,4" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,6">
+                                <Button Content="Save Axis 2" Command="{Binding SaveAxis2Command}"
+                                        Padding="6,3" Margin="0,0,8,0"
+                                        ToolTip="Write changed Axis 2 parameters to the mount (:SXA2,n,v#)"/>
+                                <Button Content="Revert Defaults" Command="{Binding RevertAxis2Command}"
+                                        Padding="6,3" Foreground="Orange"
+                                        ToolTip="Reset Axis 2 parameters to firmware defaults (:SXA2,R#)"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Servo Calibration -->
+                    <GroupBox Header="Servo Calibration  ⚠ Verify against firmware before use"
+                              Foreground="Orange" Margin="0,0,0,4"
+                              ToolTip="These commands affect servo driver calibration in real time — use with caution">
+                        <WrapPanel Margin="6,4">
+                            <Button Content="Track Normally"     Command="{Binding ServoTrackNormalCommand}"  Margin="2" Padding="5,2"
+                                    ToolTip="Resume normal sidereal tracking (:TOA#)"/>
+                            <Button Content="Track Fixed Rate"   Command="{Binding ServoTrackFixedCommand}"   Margin="2" Padding="5,2"
+                                    ToolTip="Switch to fixed-rate tracking for calibration (:TOF#)"/>
+                            <Button Content="Record Calibration" Command="{Binding ServoRecordCommand}"       Margin="2" Padding="5,2"
+                                    ToolTip="Start recording calibration data (:SXC1,1#)"/>
+                            <Button Content="Stop Recording"     Command="{Binding ServoStopCommand}"         Margin="2" Padding="5,2"
+                                    ToolTip="Stop calibration recording (:SXC1,0#)"/>
+                            <Button Content="Clear Buffer"       Command="{Binding ServoClearCommand}"        Margin="2" Padding="5,2"
+                                    ToolTip="Clear the calibration buffer (:SXC2,0#)"/>
+                            <Button Content="Load Calibration"   Command="{Binding ServoLoadCalCommand}"      Margin="2" Padding="5,2"
+                                    ToolTip="Load calibration from NVM (:SXC3,0#)"/>
+                            <Button Content="Save Calibration"   Command="{Binding ServoSaveCalCommand}"      Margin="2" Padding="5,2"
+                                    ToolTip="Save calibration to NVM (:SXC3,1#)"/>
+                            <Button Content="Load Backup"        Command="{Binding ServoLoadBackupCommand}"   Margin="2" Padding="5,2"
+                                    ToolTip="Restore calibration from backup (:SXC4,0#)"/>
+                            <Button Content="Save Backup"        Command="{Binding ServoSaveBackupCommand}"   Margin="2" Padding="5,2"
+                                    ToolTip="Save current calibration as backup (:SXC4,1#)"/>
+                            <Button Content="High Pass Filter"   Command="{Binding ServoHpfCommand}"          Margin="2" Padding="5,2"
+                                    ToolTip="Apply high-pass filter (:SXC5,1#)"/>
+                            <Button Content="Low Pass Filter"    Command="{Binding ServoLpfCommand}"          Margin="2" Padding="5,2"
+                                    ToolTip="Apply low-pass filter (:SXC5,0#)"/>
+                        </WrapPanel>
+                    </GroupBox>
 
                 </StackPanel>
-            </GroupBox>
+            </Grid>
 
-            <!-- ── Guide Rate & Slew Speed ──────────────────────────────────── -->
-            <GroupBox Header="Guide Rate &amp; Slew Speed" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
-                      ToolTip="Guide rate used by the guider, and maximum slew speed for goto operations">
-                <StackPanel Margin="6,4">
-
-                    <!-- Guide rate -->
-                    <StackPanel Orientation="Horizontal" Margin="0,2">
-                        <TextBlock Text="Guide Rate:" Width="100" VerticalAlignment="Center"
-                                   ToolTip="Pulse-guide rate as a fraction of sidereal. 0=0.25×, 1=0.5×, 2=1×, 3=2×, 4=4×, 5=8×, 6=20×, 7=48×, 8=VF, 9=VVF"/>
-                        <ComboBox Width="90" SelectedIndex="{Binding GuideRateIndex}" Margin="0,0,6,0"
-                                  ItemsSource="{x:Static local:MountSettingsViewModel.GuideRateNames}"
-                                  xmlns:local="clr-namespace:NINA.Plugin.OnStepXTools.ViewModels"
-                                  ToolTip="Select the guide rate. Index 2 (1×) = sidereal guide rate, suitable for most setups."/>
-                        <Button Content="Set Guide Rate" Command="{Binding SetGuideRateCommand}" Width="110"
-                                ToolTip="Apply the selected guide rate (:R0# through :R9#)"/>
-                    </StackPanel>
-
-                    <!-- Slew speed -->
-                    <StackPanel Orientation="Horizontal" Margin="0,6">
-                        <TextBlock Text="Slew Speed:" Width="100" VerticalAlignment="Center"
-                                   ToolTip="Maximum slew speed for goto operations"/>
-                        <ComboBox Width="90" SelectedValue="{Binding SlewSpeed}" SelectedValuePath="Tag" Margin="0,0,6,0"
-                                  ToolTip="V.Fast = fastest possible slew, V.Slow = slowest (most accurate for short moves)">
-                            <ComboBoxItem Tag="{x:Static model:SlewSpeed.VFast}">V.Fast</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:SlewSpeed.Fast}">Fast</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:SlewSpeed.Normal}">Normal</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:SlewSpeed.Slow}">Slow</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:SlewSpeed.VSlow}">V.Slow</ComboBoxItem>
-                        </ComboBox>
-                        <Button Content="Set Slew Speed" Command="{Binding SetSlewSpeedCommand}" Width="110"
-                                ToolTip="Apply the selected slew speed (:RS0# through :RS4#)"/>
-                    </StackPanel>
-
-                </StackPanel>
-            </GroupBox>
-
-            <!-- ── Meridian Flip & Park ──────────────────────────────────────── -->
-            <GroupBox Header="Meridian Flip &amp; Park" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
-                      ToolTip="GEM meridian flip behaviour and park position settings">
-                <StackPanel Margin="6,4">
-
-                    <StackPanel Orientation="Horizontal" Margin="0,2">
-                        <TextBlock Text="Auto Meridian Flip at limit:" Width="190" VerticalAlignment="Center"
-                                   ToolTip="When enabled the mount automatically flips to the other pier side when it reaches the meridian limit (:SXE6,n#)"/>
-                        <CheckBox IsChecked="{Binding AutoMeridianFlip}" VerticalAlignment="Center"
-                                  ToolTip="Enable automatic meridian flip at the configured limit"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="Pause at home position:" Width="190" VerticalAlignment="Center"
-                                   ToolTip="Mount pauses at the home (index) position before continuing a meridian flip (:SXE7,n#)"/>
-                        <CheckBox IsChecked="{Binding PauseAtHome}" VerticalAlignment="Center"
-                                  ToolTip="Pause at home switch during meridian flip"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="Goto buzzer/alert:" Width="190" VerticalAlignment="Center"
-                                   ToolTip="Play a beep when a goto slew completes (:SXE5,n#)"/>
-                        <CheckBox IsChecked="{Binding BuzzerEnabled}" VerticalAlignment="Center"
-                                  ToolTip="Enable the audible alert tone at end of goto"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="Preferred pier side:" Width="190" VerticalAlignment="Center"
-                                   ToolTip="Which pier side to prefer when both are valid after a meridian flip (:SXE8,n#)"/>
-                        <ComboBox Width="80" SelectedValue="{Binding PreferredPierSide}" SelectedValuePath="Tag"
-                                  ToolTip="Best = firmware decides. East/West = always flip to that side when possible.">
-                            <ComboBoxItem Tag="{x:Static model:PreferredPierSide.Best}">Best</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:PreferredPierSide.West}">West</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:PreferredPierSide.East}">East</ComboBoxItem>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                        <Button Content="Apply Meridian Settings"
-                                Command="{Binding SetMeridianSettingsCommand}"
-                                Padding="8,3" Margin="0,0,12,0"
-                                ToolTip="Write all four meridian/buzzer settings to the mount in one step (:SXE5–8#)"/>
-                        <Button Content="Trigger Meridian Flip Now"
-                                Command="{Binding TriggerMeridianFlipCommand}"
-                                Padding="8,3" Foreground="Orange" Margin="0,0,12,0"
-                                ToolTip="Force a meridian flip immediately - use carefully, mount will slew to the opposite pier side (:Mf#)"/>
-                        <Button Content="Set Park to Current Coords"
-                                Command="{Binding SetParkCommand}"
-                                Padding="8,3"
-                                ToolTip="Save the current mount position as the park position (:hQ#)"/>
-                    </StackPanel>
-
-                </StackPanel>
-            </GroupBox>
-
-            <!-- ── Backlash ──────────────────────────────────────────────────── -->
-            <GroupBox Header="Backlash (arcseconds)" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
-                      ToolTip="Gear backlash compensation applied during direction reversals. Set to 0 to disable. Valid range 0–3600&quot;.">
-                <Grid Margin="6,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="160"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="20"/>
-                        <ColumnDefinition Width="160"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" Text="Axis 1 - RA / Azimuth:" VerticalAlignment="Center"
-                               ToolTip="Backlash on the RA/Azimuth axis in arcseconds (read via :%BR#)"/>
-                    <TextBox   Grid.Column="1" Text="{Binding BacklashAxis1Arcsec, UpdateSourceTrigger=PropertyChanged}"
-                               ToolTip="Enter backlash in arcseconds (0–3600). Typical values: 5–60&quot;."/>
-                    <TextBlock Grid.Column="3" Text="Axis 2 - Dec / Altitude:" VerticalAlignment="Center"
-                               ToolTip="Backlash on the Dec/Altitude axis in arcseconds (read via :%BD#)"/>
-                    <TextBox   Grid.Column="4" Text="{Binding BacklashAxis2Arcsec, UpdateSourceTrigger=PropertyChanged}"
-                               ToolTip="Enter backlash in arcseconds (0–3600). Typical values: 5–60&quot;."/>
-                    <Button    Grid.Column="5" Content="Set Backlash"
-                               Command="{Binding SetBacklashCommand}" HorizontalAlignment="Left" Margin="10,0,0,0"
-                               ToolTip="Write both backlash values to the mount (:$BRn# for axis 1, :$BDn# for axis 2)"/>
-                </Grid>
-            </GroupBox>
-
-            <!-- ── Limits ────────────────────────────────────────────────────── -->
-            <GroupBox Header="Limits" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
-                      ToolTip="Movement limits that prevent the mount from pointing into unsafe zones">
-                <StackPanel Margin="6,4">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="80"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Min Altitude (°):" VerticalAlignment="Center" Margin="0,2"
-                                   ToolTip="Minimum altitude the mount will slew to. Objects below this are rejected by goto commands - :Gh# / :Sh#."/>
-                        <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding LimitMinAltDeg, StringFormat='{}{0:F0}', UpdateSourceTrigger=PropertyChanged}" Margin="4,2"
-                                   ToolTip="Minimum altitude in degrees (−30 to +30). Default −10."/>
-                        <TextBlock Grid.Row="0" Grid.Column="3" Text="Max Altitude (°):" VerticalAlignment="Center" Margin="0,2"
-                                   ToolTip="Maximum altitude the mount will slew to. Prevents slewing above the zenith into the danger zone - :Go# / :So#."/>
-                        <TextBox   Grid.Row="0" Grid.Column="4" Text="{Binding LimitMaxAltDeg, StringFormat='{}{0:F0}', UpdateSourceTrigger=PropertyChanged}" Margin="4,2"
-                                   ToolTip="Maximum altitude in degrees (60–90). Default 87."/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Degrees past meridian East# (°):" VerticalAlignment="Center" Margin="0,6,0,2" FontSize="11"
-                                   ToolTip="How far East of the meridian the mount may track before a flip is required. Positive = more time before flip - :GXE9."/>
-                        <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding LimitEastPastMeridian, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Margin="4,6,4,2"
-                                   ToolTip="Degrees of HA the mount tracks East past the meridian (0–270°)"/>
-                        <TextBlock Grid.Row="1" Grid.Column="3" Text="Degrees past meridian West (°):" VerticalAlignment="Center" Margin="0,6,0,2" FontSize="11"
-                                   ToolTip="How far West of the meridian the mount may track before stopping. Allows counterweight-up operation - :GXEA#."/>
-                        <TextBox   Grid.Row="1" Grid.Column="4" Text="{Binding LimitWestPastMeridian, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Margin="4,6,4,2"
-                                   ToolTip="Degrees of HA the mount tracks West past the meridian (0–270°)"/>
-                    </Grid>
-
-                    <Button Content="Set All Limits"
-                            Command="{Binding SetLimitsCommand}"
-                            HorizontalAlignment="Left" Padding="8,3" Margin="0,8,0,0"
-                            ToolTip="Write all four limit values to the mount in one step (:Sh# :So# :SXE9# :SXEA#)"/>
-                </StackPanel>
-            </GroupBox>
-
-            <!-- ── Mount Type & Controller ───────────────────────────────────── -->
-            <GroupBox Header="Mount Type &amp; Controller" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4"
-                      ToolTip="Mount geometry and controller reset">
-                <StackPanel Margin="6,4">
-                    <StackPanel Orientation="Horizontal" Margin="0,2">
-                        <TextBlock Text="Mount type:" Width="200" VerticalAlignment="Center"
-                                   ToolTip="GEM=0, EQ Fork=1, Alt/Az=2. Reboot required after change."/>
-                        <ComboBox Width="120" SelectedValue="{Binding MountType}" SelectedValuePath="Tag" Margin="0,0,8,0"
-                                  ToolTip="Select the mount geometry. Reboot required after changing.">
-                            <ComboBoxItem Tag="{x:Static model:MountType.GEM}">GEM</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:MountType.EQFork}">EQ Fork</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static model:MountType.AltAz}">Alt/Az</ComboBoxItem>
-                        </ComboBox>
-                        <Button Content="Set Mount Type" Command="{Binding SetMountTypeCommand}" Padding="6,2"
-                                ToolTip="Send :SXEM,n# - reboot required for the change to take effect"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,6">
-                        <TextBlock Text="Reboot controller:" Width="200" VerticalAlignment="Center"
-                                   ToolTip="Sends a software reset to the OnStepX controller"/>
-                        <Button Content="Reboot Controller" Command="{Binding RebootCommand}"
-                                Foreground="OrangeRed" Padding="6,2"
-                                ToolTip="Send :ERESET# - the mount will disconnect and reconnect"/>
-                        <TextBlock Text="  ⚠ Mount will disconnect" VerticalAlignment="Center"
-                                   Foreground="Orange" FontSize="10" Margin="8,0,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-            </GroupBox>
-
-            <!-- ── Axis 1 ────────────────────────────────────────────────────── -->
-            <GroupBox Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4">
-                <GroupBox.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Axis 1 - RA / Azimuth   " FontWeight="Bold"/>
-                        <TextBlock Text="{Binding Axis1DriverId}" Foreground="CornflowerBlue" FontStyle="Italic"/>
-                    </StackPanel>
-                </GroupBox.Header>
-                <StackPanel Margin="4,2">
-                    <ItemsControl ItemsSource="{Binding Axis1Params}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type model:AxisParameter}">
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="260"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" VerticalAlignment="Center">
-                                        <Run Text="{Binding Name, Mode=OneWay}"/>
-                                        <Run Text="{Binding RangeHint, Mode=OneWay}" Foreground="Gray" FontSize="10"/>
-                                        <Run Text="{Binding ImmediateHint, Mode=OneWay}" Foreground="DarkSeaGreen" FontSize="10"/>
-                                    </TextBlock>
-                                    <CheckBox Grid.Column="1"
-                                              Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
-                                              VerticalAlignment="Center" Margin="4,0"
-                                              IsChecked="{Binding EditValue, Converter={StaticResource BoolStringConverter}}"/>
-                                    <TextBox Grid.Column="1"
-                                             Visibility="{Binding IsBoolean, Converter={StaticResource InvBoolToVis}}"
-                                             Text="{Binding EditValue, UpdateSourceTrigger=PropertyChanged}"
-                                             FontFamily="Courier New" Margin="4,0"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding CurrentValue, StringFormat='current: {0}'}"
-                                               VerticalAlignment="Center" Foreground="Gray" FontSize="10" Margin="4,0"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Visibility="{Binding Axis1Params.Count, Converter={StaticResource ZeroToVis}}"
-                               Text="No runtime-configurable parameters (:GXA returned 0). This firmware build uses compile-time motor constants."
-                               Foreground="Gray" FontStyle="Italic" FontSize="10" Margin="4,4" TextWrapping="Wrap"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,6">
-                        <Button Content="Save Axis 1" Command="{Binding SaveAxis1Command}"
-                                Padding="8,3" Margin="0,0,12,0"
-                                ToolTip="Write changed Axis 1 parameters to the mount  (:SXA1,n,v#)"/>
-                        <Button Content="Revert to Defaults" Command="{Binding RevertAxis1Command}"
-                                Padding="8,3" Foreground="Orange"
-                                ToolTip="Reset all Axis 1 parameters to firmware defaults  (:SXA1,R#)"/>
-                    </StackPanel>
-                </StackPanel>
-            </GroupBox>
-
-            <!-- ── Axis 2 ────────────────────────────────────────────────────── -->
-            <GroupBox Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,4">
-                <GroupBox.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Axis 2 - Dec / Altitude   " FontWeight="Bold"/>
-                        <TextBlock Text="{Binding Axis2DriverId}" Foreground="CornflowerBlue" FontStyle="Italic"/>
-                    </StackPanel>
-                </GroupBox.Header>
-                <StackPanel Margin="4,2">
-                    <ItemsControl ItemsSource="{Binding Axis2Params}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type model:AxisParameter}">
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="260"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" VerticalAlignment="Center">
-                                        <Run Text="{Binding Name, Mode=OneWay}"/>
-                                        <Run Text="{Binding RangeHint, Mode=OneWay}" Foreground="Gray" FontSize="10"/>
-                                        <Run Text="{Binding ImmediateHint, Mode=OneWay}" Foreground="DarkSeaGreen" FontSize="10"/>
-                                    </TextBlock>
-                                    <CheckBox Grid.Column="1"
-                                              Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
-                                              VerticalAlignment="Center" Margin="4,0"
-                                              IsChecked="{Binding EditValue, Converter={StaticResource BoolStringConverter}}"/>
-                                    <TextBox Grid.Column="1"
-                                             Visibility="{Binding IsBoolean, Converter={StaticResource InvBoolToVis}}"
-                                             Text="{Binding EditValue, UpdateSourceTrigger=PropertyChanged}"
-                                             FontFamily="Courier New" Margin="4,0"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding CurrentValue, StringFormat='current: {0}'}"
-                                               VerticalAlignment="Center" Foreground="Gray" FontSize="10" Margin="4,0"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Visibility="{Binding Axis2Params.Count, Converter={StaticResource ZeroToVis}}"
-                               Text="No runtime-configurable parameters (:GXA returned 0). This firmware build uses compile-time motor constants."
-                               Foreground="Gray" FontStyle="Italic" FontSize="10" Margin="4,4" TextWrapping="Wrap"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,6">
-                        <Button Content="Save Axis 2" Command="{Binding SaveAxis2Command}"
-                                Padding="8,3" Margin="0,0,12,0"
-                                ToolTip="Write changed Axis 2 parameters to the mount  (:SXA2,n,v#)"/>
-                        <Button Content="Revert to Defaults" Command="{Binding RevertAxis2Command}"
-                                Padding="8,3" Foreground="Orange"
-                                ToolTip="Reset all Axis 2 parameters to firmware defaults  (:SXA2,R#)"/>
-                    </StackPanel>
-                </StackPanel>
-            </GroupBox>
-
-            <!-- ── Servo Calibration ─────────────────────────────────────────── -->
-            <GroupBox Header="Servo Calibration  ⚠ Verify command strings against firmware before use"
-                      Foreground="Orange" Margin="0,0,0,4"
-                      ToolTip="These commands affect servo driver calibration in real time - use with caution">
-                <WrapPanel Margin="6,4">
-                    <Button Content="Track Normally"     Command="{Binding ServoTrackNormalCommand}"  Margin="2" Padding="6,2"
-                            ToolTip="Resume normal sidereal tracking (:TOA#)"/>
-                    <Button Content="Track Fixed Rate"   Command="{Binding ServoTrackFixedCommand}"   Margin="2" Padding="6,2"
-                            ToolTip="Switch to fixed-rate tracking for servo calibration (:TOF#)"/>
-                    <Button Content="Record Calibration" Command="{Binding ServoRecordCommand}"       Margin="2" Padding="6,2"
-                            ToolTip="Start recording calibration data (:SXC1,1#)"/>
-                    <Button Content="Stop Recording"     Command="{Binding ServoStopCommand}"         Margin="2" Padding="6,2"
-                            ToolTip="Stop calibration recording (:SXC1,0#)"/>
-                    <Button Content="Clear Buffer"       Command="{Binding ServoClearCommand}"        Margin="2" Padding="6,2"
-                            ToolTip="Clear the calibration buffer (:SXC2,0#)"/>
-                    <Button Content="Load Calibration"   Command="{Binding ServoLoadCalCommand}"     Margin="2" Padding="6,2"
-                            ToolTip="Load calibration from non-volatile memory (:SXC3,0#)"/>
-                    <Button Content="Save Calibration"   Command="{Binding ServoSaveCalCommand}"     Margin="2" Padding="6,2"
-                            ToolTip="Save calibration to non-volatile memory (:SXC3,1#)"/>
-                    <Button Content="Load Backup"        Command="{Binding ServoLoadBackupCommand}"  Margin="2" Padding="6,2"
-                            ToolTip="Restore calibration from backup (:SXC4,0#)"/>
-                    <Button Content="Save Backup"        Command="{Binding ServoSaveBackupCommand}"  Margin="2" Padding="6,2"
-                            ToolTip="Save current calibration as backup (:SXC4,1#)"/>
-                    <Button Content="High Pass Filter"   Command="{Binding ServoHpfCommand}"         Margin="2" Padding="6,2"
-                            ToolTip="Apply high-pass filter to calibration data (:SXC5,1#)"/>
-                    <Button Content="Low Pass Filter"    Command="{Binding ServoLpfCommand}"         Margin="2" Padding="6,2"
-                            ToolTip="Apply low-pass filter to calibration data (:SXC5,0#)"/>
-                </WrapPanel>
-            </GroupBox>
-
-            <!-- Bottom status -->
+            <!-- ── Status bar (full width) ───────────────────────────────────── -->
             <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource PrimaryBrush}"
                        Margin="0,4,0,0" FontStyle="Italic" FontSize="11"/>
 

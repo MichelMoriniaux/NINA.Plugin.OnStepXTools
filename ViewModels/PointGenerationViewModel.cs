@@ -32,6 +32,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private readonly IProfileService         _profile;
         private readonly IOnStepXMount           _mount;
         private readonly ITelescopeMediator      _telescope;
+        private readonly ICameraMediator         _camera;
         private readonly IModelBuilderMediator   _builderMediator;
         private readonly IModelBuilder           _builder;
         private readonly ModelPointGenerator     _generator = new();
@@ -69,6 +70,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             IProfileService       profile,
             IOnStepXMount         mount,
             ITelescopeMediator    telescope,
+            ICameraMediator       camera,
             IModelBuilderMediator builderMediator,
             IModelBuilder         builder)
             : base(profile) {
@@ -77,6 +79,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             _profile         = profile;
             _mount           = mount;
             _telescope       = telescope;
+            _camera          = camera;
             _builderMediator = builderMediator;
             _builder         = builder;
 
@@ -92,7 +95,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             SavePointsCommand        = new RelayCommand(_ => SavePoints(),      _ => _points.Count > 0);
             LoadPointsCommand        = new RelayCommand(_ => LoadPoints());
             StartBuildCommand        = new RelayCommand(async _ => await StartBuildAsync(),
-                                           _ => _plannedPoints.Count > 0 && !_isBuilding && _mountConnected);
+                                           _ => _plannedPoints.Count > 0 && !_isBuilding
+                                                && _mountConnected && _camera.GetInfo().Connected);
             CancelBuildCommand       = new RelayCommand(_ => _buildCts?.Cancel(), _ => _isBuilding);
             WriteToMountCommand      = new RelayCommand(async _ => await WriteCoefficientsAsync(), _ => _coefficients != null);
             WriteToEepromCommand     = new RelayCommand(async _ => await WriteToEepromAsync(),     _ => _coefficients != null && _mountConnected);
@@ -149,8 +153,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         public ObservableCollection<AlignmentPoint> Points {
             get => _points;
-            private set => SetProperty(ref _points, value);
+            private set {
+                SetProperty(ref _points, value);
+                RaisePropertyChanged(nameof(HasPoints));
+            }
         }
+
+        public bool HasPoints => _points.Count > 0;
 
         // ── Model coefficients ───────────────────────────────────────────────────
 
@@ -573,7 +582,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private static PlotModel BuildResidualScatter(IReadOnlyList<ResidualPoint> residuals) {
             var model = new PlotModel {
-                Title      = "Residuals  ΔRA vs ΔDec",
+                Title      = "Residuals",
                 Background = OxyColor.FromRgb(0x0a, 0x0a, 0x1e),
                 TextColor  = OxyColors.LightGray
             };

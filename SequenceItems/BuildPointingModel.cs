@@ -33,6 +33,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
         private readonly IPlateSolverFactory    _solverFactory;
         private readonly IProfileService        _profile;
         private readonly IModelBuilderMediator  _mediator;
+        private readonly IWeatherDataMediator   _weather;
         private readonly PointGenerationViewModel? _pointGenVM;
 
         private static readonly string DefaultCoeffsPath = Path.Combine(
@@ -53,6 +54,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
             IPlateSolverFactory solverFactory,
             IProfileService profile,
             IModelBuilderMediator mediator,
+            IWeatherDataMediator weather,
             [Import(AllowDefault = true)] PointGenerationViewModel? pointGenVM) {
             _mount         = mount;
             _telescope     = telescope;
@@ -60,6 +62,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
             _solverFactory = solverFactory;
             _profile       = profile;
             _mediator      = mediator;
+            _weather       = weather;
             _pointGenVM    = pointGenVM;
 
             LoadPointsCommand         = new ViewModels.RelayCommand(_ => LoadPoints());
@@ -126,7 +129,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
                 ResumeSessionId               = resumeId
             };
 
-            var builder = new ModelBuilder(_mount, _telescope, _imaging, _solverFactory, _profile, _mediator);
+            var builder = new ModelBuilder(_mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _weather);
             var coefficients = await builder.BuildModelAsync(
                 new List<AlignmentPoint>(_points), opts, progress, token);
 
@@ -187,7 +190,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
 
         public override object Clone() {
             var clone = new BuildPointingModel(
-                    _mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _pointGenVM) {
+                    _mount, _telescope, _imaging, _solverFactory, _profile, _mediator, _weather, _pointGenVM) {
                 WriteToMount           = WriteToMount,
                 ResumeLastSession      = ResumeLastSession,
                 SaveCoefficientsToFile = SaveCoefficientsToFile,

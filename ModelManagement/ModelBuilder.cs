@@ -21,12 +21,13 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
     [Export(typeof(IModelBuilder))]
     [PartCreationPolicy(CreationPolicy.Shared)]
     public class ModelBuilder : IModelBuilder {
-        private readonly IOnStepXMount         _mount;
-        private readonly ITelescopeMediator    _telescope;
-        private readonly IImagingMediator      _imaging;
-        private readonly IPlateSolverFactory   _solverFactory;
-        private readonly IProfileService       _profile;
-        private readonly IModelBuilderMediator _mediator;
+        private readonly IOnStepXMount          _mount;
+        private readonly ITelescopeMediator     _telescope;
+        private readonly IImagingMediator       _imaging;
+        private readonly IPlateSolverFactory    _solverFactory;
+        private readonly IProfileService        _profile;
+        private readonly IModelBuilderMediator  _mediator;
+        private readonly IWeatherDataMediator   _weather;
         private readonly ModelBuildSessionStore _store = new();
 
         [ImportingConstructor]
@@ -36,13 +37,15 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             IImagingMediator imaging,
             IPlateSolverFactory solverFactory,
             IProfileService profile,
-            IModelBuilderMediator mediator) {
+            IModelBuilderMediator mediator,
+            IWeatherDataMediator weather) {
             _mount         = mount;
             _telescope     = telescope;
             _imaging       = imaging;
             _solverFactory = solverFactory;
             _profile       = profile;
             _mediator      = mediator;
+            _weather       = weather;
         }
 
         public async Task<AlignmentModelCoefficients?> BuildModelAsync(
@@ -284,24 +287,51 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             out double pressureMbar, out double temperatureCelsius,
             double siteElevationM) {
 
-            // ISA sea-level → elevation (barometric formula)
-            pressureMbar      = 1013.25 * Math.Pow(1.0 - 2.25577e-5 * siteElevationM, 5.25588);
-            temperatureCelsius = 10.0; // conservative default
+            // Source 3 — standard atmosphere fallback (ISA sea-level → elevation)
+            pressureMbar       = 1013.25 * Math.Pow(1.0 - 2.25577e-5 * siteElevationM, 5.25588);
+            temperatureCelsius = 10.0;
 
+            bool haveTemp = false, havePress = false;
+
+            // Source 1 — mount weather sensors (highest priority; read directly via LX200)
             try {
                 var tStr = _telescope.SendCommandString(":GX9A#", raw: true);
                 var pStr = _telescope.SendCommandString(":GX9B#", raw: true);
+
                 if (!string.IsNullOrWhiteSpace(tStr) &&
                     double.TryParse(tStr.TrimEnd('#').Trim(),
                         System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out var t))
+                        System.Globalization.CultureInfo.InvariantCulture, out var t)) {
                     temperatureCelsius = t;
+                    haveTemp = true;
+                }
                 if (!string.IsNullOrWhiteSpace(pStr) &&
                     double.TryParse(pStr.TrimEnd('#').Trim(),
                         System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out var p) && p > 0)
+                        System.Globalization.CultureInfo.InvariantCulture, out var p) && p > 0) {
                     pressureMbar = p;
-            } catch { /* keep defaults */ }
+                    havePress = true;
+                }
+            } catch { /* fall through to next source */ }
+
+            if (haveTemp && havePress) return;
+
+            // Source 2 — NINA weather device (IWeatherDataMediator)
+            try {
+                var wx = _weather.GetInfo();
+                if (wx.Connected) {
+                    if (!haveTemp && !double.IsNaN(wx.Temperature))  { temperatureCelsius = wx.Temperature;  haveTemp  = true; }
+                    if (!havePress && !double.IsNaN(wx.Pressure) && wx.Pressure > 0) { pressureMbar = wx.Pressure; havePress = true; }
+                }
+            } catch { /* fall through to standard atmosphere */ }
+
+            if (!haveTemp || !havePress)
+                Logger.Debug($"OnStepX refraction: using standard atmosphere " +
+                             $"(mount sensor={haveTemp}/{havePress}, weather device connected={TryWeatherConnected()})");
+        }
+
+        private bool TryWeatherConnected() {
+            try { return _weather.GetInfo().Connected; } catch { return false; }
         }
 
         // Alt/Az → JNOW apparent equatorial coordinates (topocentric).
