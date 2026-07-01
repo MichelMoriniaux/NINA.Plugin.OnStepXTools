@@ -160,8 +160,46 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public double MeridianExclusionDeg {
             get => _meridianExclusionDeg;
             set {
-                if (SetProperty(ref _meridianExclusionDeg, Math.Max(0, value)))
-                    RaisePropertyChanged(nameof(SkyPlot));
+                if (SetProperty(ref _meridianExclusionDeg, Math.Max(0, value))) {
+                    Options.MeridianExclusionHalfWidthDeg = _meridianExclusionDeg;
+                    Generate();
+                }
+            }
+        }
+
+        public double MinAltitudeDeg {
+            get => Options.MinAltitudeDeg;
+            set {
+                var next = Math.Clamp(value, -30.0, 90.0);
+                var changed = Math.Abs(Options.MinAltitudeDeg - next) >= 0.001;
+                if (next > Options.MaxAltitudeDeg) {
+                    Options.MaxAltitudeDeg = next;
+                    changed = true;
+                }
+                if (!changed) return;
+                Options.MinAltitudeDeg = next;
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(MaxAltitudeDeg));
+                RaisePropertyChanged(nameof(Options));
+                Generate();
+            }
+        }
+
+        public double MaxAltitudeDeg {
+            get => Options.MaxAltitudeDeg;
+            set {
+                var next = Math.Clamp(value, -30.0, 90.0);
+                var changed = Math.Abs(Options.MaxAltitudeDeg - next) >= 0.001;
+                if (next < Options.MinAltitudeDeg) {
+                    Options.MinAltitudeDeg = next;
+                    changed = true;
+                }
+                if (!changed) return;
+                Options.MaxAltitudeDeg = next;
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(MinAltitudeDeg));
+                RaisePropertyChanged(nameof(Options));
+                Generate();
             }
         }
 
