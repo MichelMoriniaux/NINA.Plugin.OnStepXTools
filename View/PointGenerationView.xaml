@@ -54,6 +54,9 @@
                                         ToolTip="Load model coefficients from a JSON file"/>
                             </StackPanel>
 
+                            <Expander Header="Advanced parameters" IsExpanded="False" Margin="0,0,0,8">
+                                <StackPanel Margin="0,4,0,0">
+
                     <!-- Mode -->
                             <TextBlock Text="Mode:" Margin="0,0,0,2"/>
                             <ComboBox SelectedValue="{Binding SelectedMode}" SelectedValuePath="Tag" Margin="0,0,0,8"
@@ -151,6 +154,9 @@
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
+
+                                </StackPanel>
+                            </Expander>
 
                     <!-- Point count -->
                             <TextBlock Text="Desired Point Count:" Margin="0,0,0,2"

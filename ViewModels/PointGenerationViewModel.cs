@@ -577,14 +577,17 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 double maxErr = residuals.Max(p => p.TotalErrorArcsec);
                 double scale  = maxErr > 0 ? 0.4 / maxErr * errorArrowScale : 0;
                 foreach (var rp in residuals) {
+                    if (scale <= 0 || !double.IsFinite(rp.TotalErrorArcsec)) continue;
+
                     double r  = (90.0 - rp.AltitudeDeg) / 90.0;
                     double ar = rp.AzimuthDeg * Math.PI / 180.0;
                     double x  = r * Math.Sin(ar);
                     double y  = r * Math.Cos(ar);
+                    double x2 = x + rp.ErrorRAArcsec  * scale;
+                    double y2 = y + rp.ErrorDecArcsec * scale;
+
                     var arrow = new LineSeries { Color = OxyColors.Yellow, StrokeThickness = 1.5 };
-                    arrow.Points.Add(new DataPoint(x, y));
-                    arrow.Points.Add(new DataPoint(x + rp.ErrorRAArcsec  * scale * 0.001,
-                                                   y + rp.ErrorDecArcsec * scale * 0.001));
+                    AddArrow(arrow, x, y, x2, y2);
                     model.Series.Add(arrow);
                 }
             }
@@ -636,6 +639,32 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 ann.Points.Add(new DataPoint(Math.Sin(ar), Math.Cos(ar)));
             }
             model.Annotations.Add(ann);
+        }
+
+        private static void AddArrow(LineSeries series, double x1, double y1, double x2, double y2) {
+            series.Points.Add(new DataPoint(x1, y1));
+            series.Points.Add(new DataPoint(x2, y2));
+
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+            double length = Math.Sqrt(dx * dx + dy * dy);
+            if (length <= 0) return;
+
+            double ux = dx / length;
+            double uy = dy / length;
+            double headLength = Math.Min(0.05, length * 0.35);
+            double headWidth = headLength * 0.5;
+            double bx = x2 - ux * headLength;
+            double by = y2 - uy * headLength;
+            double px = -uy;
+            double py = ux;
+
+            series.Points.Add(new DataPoint(double.NaN, double.NaN));
+            series.Points.Add(new DataPoint(x2, y2));
+            series.Points.Add(new DataPoint(bx + px * headWidth, by + py * headWidth));
+            series.Points.Add(new DataPoint(double.NaN, double.NaN));
+            series.Points.Add(new DataPoint(x2, y2));
+            series.Points.Add(new DataPoint(bx - px * headWidth, by - py * headWidth));
         }
 
         // ── Residuals scatter plot ────────────────────────────────────────────────
