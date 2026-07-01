@@ -3,6 +3,7 @@ using System.ComponentModel.Composition;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
+using NINA.Core.Utility;
 using NINA.Equipment.Interfaces.Mediator;
 using NINA.Plugin.OnStepXTools.Interfaces;
 using NINA.Plugin.OnStepXTools.Model;
@@ -176,7 +177,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         // ── Alignment ────────────────────────────────────────────────────────────
 
         public Task ClearAlignmentModelAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":SX09,0#"), ct);
+            Task.Run(() => SendAck(":SX09,0#"), ct);
 
         public Task UploadAlignmentStarAsync(
             long actualHAArcsec, long actualDecArcsec,
@@ -186,42 +187,49 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 // Protocol: :SX0A (actual HA), :SX0B (actual Dec),
                 //           :SX0C (mount HA),  :SX0D (mount Dec),
                 //           :SX0E (pier side and commit)
-                _cmd.SendBlind($":SX0A,{actualHAArcsec}#");
-                _cmd.SendBlind($":SX0B,{actualDecArcsec}#");
-                _cmd.SendBlind($":SX0C,{mountHAArcsec}#");
-                _cmd.SendBlind($":SX0D,{mountDecArcsec}#");
-                _cmd.SendBlind($":SX0E,{pierSide}#");
+                SendAck($":SX0A,{actualHAArcsec}#");
+                SendAck($":SX0B,{actualDecArcsec}#");
+                SendAck($":SX0C,{mountHAArcsec}#");
+                SendAck($":SX0D,{mountDecArcsec}#");
+                SendAck($":SX0E,{pierSide}#");
             }, ct);
         }
 
         public Task ComputeAlignmentOnControllerAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":SX09,1#"), ct);
+            Task.Run(() => SendAck(":SX09,1#"), ct);
 
         public Task SaveAlignmentToEepromAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":AW#"), ct);
+            Task.Run(() => SendAck(":AW#"), ct);
 
         public Task ForceModelActivationAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":SX09,2#"), ct);
+            Task.Run(() => SendAck(":SX09,2#"), ct);
 
         public Task WriteCoefficientsAsync(AlignmentModelCoefficients c, CancellationToken ct = default) {
             return Task.Run(() => {
                 static string V(double v) => v.ToString("F6", CultureInfo.InvariantCulture);
-                _cmd.SendBlind($":SX00,{V(c.Ax1Cor)}#");
-                _cmd.SendBlind($":SX01,{V(c.Ax2Cor)}#");
-                _cmd.SendBlind($":SX02,{V(c.AltCor)}#");
-                _cmd.SendBlind($":SX03,{V(c.AzmCor)}#");
-                _cmd.SendBlind($":SX04,{V(c.DoCor)}#");
-                _cmd.SendBlind($":SX05,{V(c.PdCor)}#");
-                _cmd.SendBlind($":SX06,{V(c.DfCor)}#");
-                _cmd.SendBlind($":SX07,{V(c.TfCor)}#");
-                _cmd.SendBlind($":SX08,{V(c.Hcp)}#");
-                _cmd.SendBlind($":SX09,{V(c.Hca)}#");
-                _cmd.SendBlind($":SX0a,{V(c.Dcp)}#");
-                _cmd.SendBlind($":SX0b,{V(c.Dca)}#");
+                SendAck($":SX00,{V(c.Ax1Cor)}#");
+                SendAck($":SX01,{V(c.Ax2Cor)}#");
+                SendAck($":SX02,{V(c.AltCor)}#");
+                SendAck($":SX03,{V(c.AzmCor)}#");
+                SendAck($":SX04,{V(c.DoCor)}#");
+                SendAck($":SX05,{V(c.PdCor)}#");
+                SendAck($":SX06,{V(c.DfCor)}#");
+                SendAck($":SX07,{V(c.TfCor)}#");
+                SendAck($":SX08,{V(c.Hcp)}#");
+                SendAck($":SX09,{V(c.Hca)}#");
+                SendAck($":SX0a,{V(c.Dcp)}#");
+                SendAck($":SX0b,{V(c.Dca)}#");
             }, ct);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────
+
+        private void SendAck(string command) {
+            if (_cmd.SendBool(command)) return;
+
+            Logger.Error($"OnStepX command rejected or failed: {command}");
+            throw new InvalidOperationException($"OnStepX rejected command {command}");
+        }
 
         private static double? ParseHMS(string? s) {
             if (s == null) return null;

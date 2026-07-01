@@ -278,6 +278,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 long actualDecArcsec  = (long)(point.SolvedDecDeg  * 3600.0);
                 long mountHAArcsec    = (long)(point.MountHAHours  * 15.0 * 3600.0);
                 long mountDecArcsec   = (long)(point.MountDecDeg   * 3600.0);
+                Logger.Info($"Uploading alignment point {point.Index}: actualHA={actualHAArcsec}, actualDec={actualDecArcsec}, mountHA={mountHAArcsec}, mountDec={mountDecArcsec}, pierSide={point.PierSide}");
                 await _mount.UploadAlignmentStarAsync(
                     actualHAArcsec, actualDecArcsec,
                     mountHAArcsec, mountDecArcsec,
