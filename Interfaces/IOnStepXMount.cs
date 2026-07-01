@@ -41,8 +41,8 @@ namespace NINA.Plugin.OnStepXTools.Interfaces {
         // --- Alignment ---
         Task ClearAlignmentModelAsync(CancellationToken ct = default);
         Task UploadAlignmentStarAsync(
-            long actualHAArcsec, long actualDecArcsec,
-            long mountHAArcsec, long mountDecArcsec,
+            double actualHAHours, double actualDecDeg,
+            double mountHAHours,  double mountDecDeg,
             int pierSide, CancellationToken ct = default);
         Task ComputeAlignmentOnControllerAsync(CancellationToken ct = default);
         Task SaveAlignmentToEepromAsync(CancellationToken ct = default);

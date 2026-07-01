@@ -179,19 +179,42 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             Task.Run(() => _cmd.SendBlind(":SX09,0#"), ct);
 
         public Task UploadAlignmentStarAsync(
-            long actualHAArcsec, long actualDecArcsec,
-            long mountHAArcsec, long mountDecArcsec,
+            double actualHAHours, double actualDecDeg,
+            double mountHAHours,  double mountDecDeg,
             int pierSide, CancellationToken ct = default) {
             return Task.Run(() => {
                 // Protocol: :SX0A (actual HA), :SX0B (actual Dec),
                 //           :SX0C (mount HA),  :SX0D (mount Dec),
                 //           :SX0E (pier side and commit)
-                _cmd.SendBlind($":SX0A,{actualHAArcsec}#");
-                _cmd.SendBlind($":SX0B,{actualDecArcsec}#");
-                _cmd.SendBlind($":SX0C,{mountHAArcsec}#");
-                _cmd.SendBlind($":SX0D,{mountDecArcsec}#");
+                _cmd.SendBlind($":SX0A,{FormatHA(actualHAHours)}#");
+                _cmd.SendBlind($":SX0B,{FormatDec(actualDecDeg)}#");
+                _cmd.SendBlind($":SX0C,{FormatHA(mountHAHours)}#");
+                _cmd.SendBlind($":SX0D,{FormatDec(mountDecDeg)}#");
                 _cmd.SendBlind($":SX0E,{pierSide}#");
             }, ct);
+        }
+
+        // LX200 HA format: HH:MM:SS  (normalised to 0–23 h)
+        private static string FormatHA(double haHours) {
+            haHours = ((haHours % 24.0) + 24.0) % 24.0;
+            int h = (int)haHours;
+            int m = (int)((haHours - h) * 60.0);
+            int s = (int)Math.Round(((haHours - h) * 60.0 - m) * 60.0);
+            if (s == 60) { m++; s = 0; }
+            if (m == 60) { h = (h + 1) % 24; m = 0; }
+            return $"{h:D2}:{m:D2}:{s:D2}";
+        }
+
+        // LX200 Dec format: sDD*MM:SS  (s = '+' or '-')
+        private static string FormatDec(double decDeg) {
+            char sign = decDeg < 0 ? '-' : '+';
+            decDeg = Math.Abs(decDeg);
+            int d = (int)decDeg;
+            int m = (int)((decDeg - d) * 60.0);
+            int s = (int)Math.Round(((decDeg - d) * 60.0 - m) * 60.0);
+            if (s == 60) { m++; s = 0; }
+            if (m == 60) { d++; m = 0; }
+            return $"{sign}{d:D2}*{m:D2}:{s:D2}";
         }
 
         public Task ComputeAlignmentOnControllerAsync(CancellationToken ct = default) =>

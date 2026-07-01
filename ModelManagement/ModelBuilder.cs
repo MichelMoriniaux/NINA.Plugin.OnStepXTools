@@ -274,13 +274,13 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             if (opts.Mode == BuildMode.StarAlignment) {
                 point.State = AlignmentPointState.Uploading;
                 // Use JNOW solved RA for HA computation (lst is also JNOW)
-                long actualHAArcsec   = (long)((lst - point.SolvedRAHours) * 15.0 * 3600.0);
-                long actualDecArcsec  = (long)(point.SolvedDecDeg  * 3600.0);
-                long mountHAArcsec    = (long)(point.MountHAHours  * 15.0 * 3600.0);
-                long mountDecArcsec   = (long)(point.MountDecDeg   * 3600.0);
+                double actualHAHours  = lst - point.SolvedRAHours;
+                double actualDecDeg   = point.SolvedDecDeg;
+                double mountHAHours   = point.MountHAHours;
+                double mountDecDeg    = point.MountDecDeg;
                 await _mount.UploadAlignmentStarAsync(
-                    actualHAArcsec, actualDecArcsec,
-                    mountHAArcsec, mountDecArcsec,
+                    actualHAHours, actualDecDeg,
+                    mountHAHours,  mountDecDeg,
                     point.PierSide, ct);
                 await _mount.ComputeAlignmentOnControllerAsync(ct);
             }
