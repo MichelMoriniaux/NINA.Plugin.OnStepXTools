@@ -26,7 +26,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
 
         private static readonly string DefaultPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "NINA", "Plugins", "OnStepX", "LastPointingModel.json");
+            "NINA", "Plugins", "OnStepXTools", "LastPointingModel.json");
 
         private string _modelFilePath = DefaultPath;
         private bool   _saveToEeprom  = false;

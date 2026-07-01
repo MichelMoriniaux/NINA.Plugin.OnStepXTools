@@ -40,7 +40,7 @@ namespace NINA.Plugin.OnStepXTools.SequenceItems {
 
         private static readonly string DefaultCoeffsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "NINA", "Plugins", "OnStepX", "LastPointingModel.json");
+            "NINA", "Plugins", "OnStepXTools", "LastPointingModel.json");
 
         private ObservableCollection<AlignmentPoint> _points = new();
         private bool   _writeToMount             = true;

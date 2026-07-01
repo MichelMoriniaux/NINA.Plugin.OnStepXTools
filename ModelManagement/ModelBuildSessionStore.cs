@@ -10,7 +10,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
     public class ModelBuildSessionStore {
         private static readonly string SessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "NINA", "Plugins", "OnStepX", "ModelBuilds");
+            "NINA", "Plugins", "OnStepXTools", "ModelBuilds");
 
         public ModelBuildSessionStore() {
             Directory.CreateDirectory(SessionDir);

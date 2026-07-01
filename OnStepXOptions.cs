@@ -9,12 +9,12 @@ namespace NINA.Plugin.OnStepXTools {
     public class OnStepXOptions {
         private static readonly string OptionsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "NINA", "Plugins", "OnStepX", "settings.json");
+            "NINA", "Plugins", "OnStepXTools", "settings.json");
 
         // Build defaults
-        public double DefaultExposureSeconds { get; set; } = 5.0;
+        public double DefaultExposureSeconds { get; set; } = 2.0;
         public double DefaultSlewSettleSeconds { get; set; } = 3.0;
-        public double DefaultRmsThresholdArcsec { get; set; } = 60.0;
+        public double DefaultRmsThresholdArcsec { get; set; } = 3600.0;
 
         // Model build defaults
         public BuildMode DefaultBuildMode { get; set; } = BuildMode.FullSkyPointingModel;
