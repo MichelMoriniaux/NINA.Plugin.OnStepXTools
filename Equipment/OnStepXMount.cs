@@ -187,11 +187,11 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 // Protocol: :SX0A (actual HA), :SX0B (actual Dec),
                 //           :SX0C (mount HA),  :SX0D (mount Dec),
                 //           :SX0E (pier side and commit)
-                _cmd.SendBlind($":SX0A,{FormatHA(actualHAHours)}#");
-                _cmd.SendBlind($":SX0B,{FormatDec(actualDecDeg)}#");
-                _cmd.SendBlind($":SX0C,{FormatHA(mountHAHours)}#");
-                _cmd.SendBlind($":SX0D,{FormatDec(mountDecDeg)}#");
-                _cmd.SendBlind($":SX0E,{pierSide}#");
+                SendAck($":SX0A,{FormatHA(actualHAHours)}#");
+                SendAck($":SX0B,{FormatDec(actualDecDeg)}#");
+                SendAck($":SX0C,{FormatHA(mountHAHours)}#");
+                SendAck($":SX0D,{FormatDec(mountDecDeg)}#");
+                SendAck($":SX0E,{pierSide}#");
             }, ct);
         }
 
