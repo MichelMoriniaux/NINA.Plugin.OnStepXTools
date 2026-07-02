@@ -3,15 +3,20 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel.Composition;
 using System.Globalization;
+using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Microsoft.Win32;
+using Newtonsoft.Json;
 using NINA.Core.Utility;
 using NINA.Equipment.Equipment.MyTelescope;
 using NINA.Equipment.Interfaces.Mediator;
 using NINA.Equipment.Interfaces.ViewModel;
 using NINA.Profile.Interfaces;
 using NINA.WPF.Base.ViewModel;
+using NINA.Plugin.OnStepXTools.Interfaces;
 using NINA.Plugin.OnStepXTools.Model;
 
 namespace NINA.Plugin.OnStepXTools.ViewModels {
@@ -21,7 +26,21 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
     public class MountSettingsViewModel : DockableVM, ITelescopeConsumer, IDisposable {
         private readonly ITelescopeMediator _telescope;
         private readonly IProfileService    _profile;
+        private readonly IOnStepXMount      _mount;
         private bool _wasConnected;
+
+        // ── Sky model state ──────────────────────────────────────────────────────
+        private AlignmentModelCoefficients? _coefficients;
+
+        public AlignmentModelCoefficients? Coefficients {
+            get => _coefficients;
+            private set {
+                SetProperty(ref _coefficients, value);
+                RaisePropertyChanged(nameof(HasModel));
+            }
+        }
+
+        public bool HasModel => _coefficients != null;
 
         public override string ContentId => "OnStepX_MountSettings";
 
@@ -34,12 +53,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private bool _axis2OldFormat;
 
         [ImportingConstructor]
-        public MountSettingsViewModel(ITelescopeMediator telescope, IProfileService profile)
+        public MountSettingsViewModel(ITelescopeMediator telescope, IProfileService profile, IOnStepXMount mount)
             : base(profile) {
             Title         = "OnStepX Mount Settings";
             ImageGeometry = System.Windows.Application.Current?.Resources["SettingsSVG"] as System.Windows.Media.GeometryGroup;
             _telescope    = telescope;
-            _profile   = profile;
+            _profile      = profile;
+            _mount        = mount;
             _telescope.RegisterConsumer(this);
             BuildCommands();
         }
@@ -88,10 +108,12 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private bool _trackingEnabled;
         private TrackingRate _trackingRate = TrackingRate.Sidereal;
         private CompensatedTracking _compensatedTracking = CompensatedTracking.Off;
+        private CompensatedTrackingAxis _compensatedTrackingAxis = CompensatedTrackingAxis.Single;
 
         public bool             TrackingEnabled     { get => _trackingEnabled;     private set => SetProperty(ref _trackingEnabled,     value); }
         public TrackingRate     TrackingRate        { get => _trackingRate;        set => SetProperty(ref _trackingRate,        value); }
         public CompensatedTracking CompensatedTracking { get => _compensatedTracking; set => SetProperty(ref _compensatedTracking, value); }
+        public CompensatedTrackingAxis CompensatedTrackingAxis { get => _compensatedTrackingAxis; set => SetProperty(ref _compensatedTrackingAxis, value); }
 
         // ── Guide Rate ───────────────────────────────────────────────────────────
 
@@ -152,6 +174,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public ICommand TrackOffCommand          { get; private set; } = null!;
         public ICommand SetTrackRateCommand      { get; private set; } = null!;
         public ICommand SetCompTrackCommand      { get; private set; } = null!;
+        public ICommand SetCompTrackAxisCommand  { get; private set; } = null!;
         public ICommand FreqPlusCommand          { get; private set; } = null!;
         public ICommand FreqMinusCommand         { get; private set; } = null!;
         public ICommand FreqResetCommand         { get; private set; } = null!;
@@ -160,6 +183,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public ICommand SetMeridianSettingsCommand { get; private set; } = null!;
         public ICommand TriggerMeridianFlipCommand { get; private set; } = null!;
         public ICommand SetParkCommand           { get; private set; } = null!;
+        public ICommand SetHomeCommand           { get; private set; } = null!;
         public ICommand SetBacklashCommand       { get; private set; } = null!;
         public ICommand SetLimitsCommand         { get; private set; } = null!;
         public ICommand SyncSiteFromNinaCommand  { get; private set; } = null!;
@@ -183,6 +207,16 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public ICommand ServoHpfCommand         { get; private set; } = null!;
         public ICommand ServoLpfCommand         { get; private set; } = null!;
 
+        // Sky Model Management commands
+        public ICommand LoadModelFromMountCommand  { get; private set; } = null!;
+        public ICommand LoadModelCommand           { get; private set; } = null!;
+        public ICommand WriteToMountCommand        { get; private set; } = null!;
+        public ICommand WriteToEepromCommand       { get; private set; } = null!;
+        public ICommand ForceActivationCommand     { get; private set; } = null!;
+        public ICommand SaveModelCommand           { get; private set; } = null!;
+        public ICommand ClearModelCommand          { get; private set; } = null!;
+        public ICommand ClearModelfromEepromCommand { get; private set; } = null!;
+
         private void BuildCommands() {
             bool Connected() => _isConnected;
             void Send(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
@@ -201,15 +235,23 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     TrackingRate.King    => ":TK#",
                     _                    => ":TQ#"
                 });
-                Status(":GU#");
+                // Status(":GU#");
             }, _ => Connected());
 
             SetCompTrackCommand = new RelayCommand(_ => {
                 // :Tn# = off, :T1# = 1-axis refraction, :T2# = 2-axis refraction, :To# = full model
                 SendBlind(CompensatedTracking switch {
-                    CompensatedTracking.RefractionOnly => ":T1#",
-                    CompensatedTracking.Full           => ":T2#",
+                    CompensatedTracking.RefractionOnly => ":Tr#",
+                    CompensatedTracking.Full           => ":To#",
                     _                                  => ":Tn#"
+                });
+            }, _ => Connected());
+
+            SetCompTrackAxisCommand = new RelayCommand(_ => {
+                // :Tn# = off, :T1# = 1-axis refraction, :T2# = 2-axis refraction, :To# = full model
+                SendBlind(CompensatedTrackingAxis switch {
+                    CompensatedTrackingAxis.Single => ":T1#",
+                    _                              => ":T2#"
                 });
             }, _ => Connected());
 
@@ -225,20 +267,20 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
             SetSlewSpeedCommand = new RelayCommand(_ => {
                 SendBlind(SlewSpeed switch {
-                    SlewSpeed.VFast  => ":RS4#",
-                    SlewSpeed.Fast   => ":RS3#",
-                    SlewSpeed.Normal => ":RS2#",
-                    SlewSpeed.Slow   => ":RS1#",
-                    _                => ":RS0#"
+                    SlewSpeed.VFast  => ":SX93,1#",
+                    SlewSpeed.Fast   => ":SX93,2#",
+                    SlewSpeed.Normal => ":SX93,3#",
+                    SlewSpeed.Slow   => ":SX93,4#",
+                    _                => ":SX93,5#"
                 });
                 StatusMessage = "Slew speed updated.";
             }, _ => Connected());
 
             SetMeridianSettingsCommand = new RelayCommand(_ => {
-                SendBlind($":SXE5,{(BuzzerEnabled       ? 1 : 0)}#");
-                SendBlind($":SXE6,{(AutoMeridianFlip    ? 1 : 0)}#");
-                SendBlind($":SXE7,{(PauseAtHome         ? 1 : 0)}#");
-                SendBlind($":SXE8,{(int)PreferredPierSide}#");
+                SendBlind($":SXE97,{(BuzzerEnabled       ? 1 : 0)}#");
+                SendBlind($":SXE95,{(AutoMeridianFlip    ? 1 : 0)}#");
+                SendBlind($":SXE98,{(PauseAtHome         ? 1 : 0)}#");
+                SendBlind($":SXE96,{PierSideToChar(PreferredPierSide)}#");
                 StatusMessage = "Meridian settings updated.";
             }, _ => Connected());
 
@@ -252,6 +294,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 StatusMessage = "Park position set to current.";
             }, _ => Connected());
 
+            SetHomeCommand = new RelayCommand(_ => {
+                SendBlind(":FH#");
+                StatusMessage = "Home position set to current.";
+            }, _ => Connected());
+
             SetBacklashCommand = new RelayCommand(_ => {
                 SendBlind($":$BR{BacklashAxis1Arcsec}#");
                 SendBlind($":$BD{BacklashAxis2Arcsec}#");
@@ -259,9 +306,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }, _ => Connected());
 
             SetLimitsCommand = new RelayCommand(_ => {
-                SendBlind($":Sh{(int)LimitMinAltDeg}#");
+                SendBlind($":Sh{(int)LimitMinAltDeg}#");  // TODO this is signed , check if sign is present 
                 SendBlind($":So{(int)LimitMaxAltDeg}#");
-                SendBlind($":SXE9,{LimitEastPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#");
+                SendBlind($":SXE9,{LimitEastPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#"); // TODO check if these are in minutes
                 SendBlind($":SXEA,{LimitWestPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#");
                 StatusMessage = "Limits updated.";
             }, _ => Connected());
@@ -273,9 +320,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     var elev = _telescope.GetInfo().SiteElevation; // mount's current elevation
                     var latCmd = FormatDMSCommand(lat, degrees: 2);
                     var lonCmd = FormatDMSCommand(lon, degrees: 3);
-                    SendBlind($":St{latCmd}#");
-                    SendBlind($":Sg{lonCmd}#");
-                    SendBlind($":Sc{((int)elev)}#");
+                    SendBlind($":St{latCmd}#"); // TODO check if these are signed and in H:M:S
+                    SendBlind($":Sg{lonCmd}#"); // TODO check if these are signed and in H:M:S
+                    SendBlind($":Sv{((int)elev)}#"); // TODO check if these are signed and in meters
                     StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F0} m";
                     await Task.Delay(200);
                     await LoadAllSettingsAsync();
@@ -284,7 +331,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 }
             }, _ => Connected());
 
-            void Status(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
+            // void Status(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
 
             // ── Axis Config commands ─────────────────────────────────────────────
             SetMountTypeCommand = new RelayCommand(_ => { SendBlind($":SXEM,{(int)MountType}#"); StatusMessage = "Mount type set - reboot required."; }, _ => Connected());
@@ -306,6 +353,16 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             ServoSaveBackupCommand  = new RelayCommand(_ => { SendBlind(":SXC4,1#"); StatusMessage = "Backup saved."; },       _ => Connected());
             ServoHpfCommand         = new RelayCommand(_ => { SendBlind(":SXC5,1#"); StatusMessage = "High-pass filter."; },   _ => Connected());
             ServoLpfCommand         = new RelayCommand(_ => { SendBlind(":SXC5,0#"); StatusMessage = "Low-pass filter."; },    _ => Connected());
+
+            // Sky Model Management
+            LoadModelFromMountCommand   = new RelayCommand(async _ => await LoadModelFromMountAsync(), _ => Connected());
+            LoadModelCommand            = new RelayCommand(_ => LoadModel());
+            WriteToMountCommand         = new RelayCommand(async _ => await WriteCoefficientsAsync(),  _ => _coefficients != null && Connected());
+            WriteToEepromCommand        = new RelayCommand(async _ => await WriteToEepromAsync(),      _ => _coefficients != null && Connected());
+            ForceActivationCommand      = new RelayCommand(async _ => await ForceModelActivationAsync(), _ => Connected());
+            SaveModelCommand            = new RelayCommand(_ => SaveModel(),        _ => _coefficients != null);
+            ClearModelCommand           = new RelayCommand(async _ => await ClearModelAsync(),         _ => Connected());
+            ClearModelfromEepromCommand = new RelayCommand(async _ => await ClearModelFromEepromAsync(), _ => Connected());
         }
 
         // ── Load settings ────────────────────────────────────────────────────────
@@ -329,18 +386,26 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                             AutoMeridianFlip  = gu.Contains('a');
                             PauseAtHome       = gu.Contains('u');
                             BuzzerEnabled     = gu.Contains('z');
+                            // Tracking rate flags
+                            if      (gu.Contains('(')) TrackingRate = TrackingRate.Lunar;
+                            else if (gu.Contains('O')) TrackingRate = TrackingRate.Solar;
+                            else if (gu.Contains('k')) TrackingRate = TrackingRate.King;
+                            else                       TrackingRate = TrackingRate.Sidereal;
                             // Rate compensation flags
                             if      (gu.Contains('t')) CompensatedTracking = CompensatedTracking.Full;
-                            else if (gu.Contains('s')) CompensatedTracking = CompensatedTracking.RefractionOnly;
                             else if (gu.Contains('r')) CompensatedTracking = CompensatedTracking.RefractionOnly;
-                            else                        CompensatedTracking = CompensatedTracking.Off;
+                            else                       CompensatedTracking = CompensatedTracking.Off;
+                            // compensation axis flags
+                            if      (gu.Contains('s')) CompensatedTrackingAxis = CompensatedTrackingAxis.Single;
+                            else                       CompensatedTrackingAxis = CompensatedTrackingAxis.Dual;
+
                         });
                     }
 
                     // ─ Preferred pier side (:GXE8#) ─────────────────────────────
-                    var ps = GetStr(":GXE8#");
-                    if (int.TryParse(ps, out var psVal))
-                        Dispatch(() => PreferredPierSide = (PreferredPierSide)Math.Clamp(psVal, 0, 2));
+                    var ps = GetStr(":GX96#");
+                    if (!string.IsNullOrWhiteSpace(ps))
+                        Dispatch(() => PreferredPierSide = PierSideFromChar(ps));
 
                     // ─ Backlash ──────────────────────────────────────────────────
                     if (int.TryParse(GetStr(":%BR#"), out var bl1))
@@ -545,25 +610,20 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private static void Dispatch(Action a) =>
             System.Windows.Application.Current?.Dispatcher.Invoke(a);
 
-        // Parse ±DD*MM:SS or ±DDD*MM:SS DMS string from OnStep to decimal degrees
-        private static double ParseDMSResponse(string s) {
-            if (string.IsNullOrWhiteSpace(s)) return 0;
-            var sign = s.StartsWith('-') ? -1 : 1;
-            s = s.TrimStart('+', '-');
-            var degEnd = s.IndexOfAny(new[] { '*', '°', ':' });
-            if (degEnd < 0) return sign * (double.TryParse(s, out var d0) ? d0 : 0);
-            double.TryParse(s[..degEnd], out var deg);
-            var rest = s[(degEnd + 1)..];
-            var minEnd = rest.IndexOf(':');
-            double min = 0, sec = 0;
-            if (minEnd >= 0) {
-                double.TryParse(rest[..minEnd], out min);
-                double.TryParse(rest[(minEnd + 1)..], NumberStyles.Any, CultureInfo.InvariantCulture, out sec);
-            } else {
-                double.TryParse(rest, out min);
-            }
-            return sign * (deg + min / 60.0 + sec / 3600.0);
-        }
+        // Mount encodes preferred pier side as a single character: B=Best, W=West, E=East, A=Auto
+        private static char PierSideToChar(PreferredPierSide s) => s switch {
+            PreferredPierSide.West => 'W',
+            PreferredPierSide.East => 'E',
+            PreferredPierSide.Auto => 'A',
+            _                      => 'B'
+        };
+
+        private static PreferredPierSide PierSideFromChar(string? s) => s?.Trim() switch {
+            "W" => PreferredPierSide.West,
+            "E" => PreferredPierSide.East,
+            "A" => PreferredPierSide.Auto,
+            _   => PreferredPierSide.Best
+        };
 
         // Format decimal degrees as ±DD*MM:SS (degrees=2) or ±DDD*MM:SS (degrees=3)
         private static string FormatDMSCommand(double decDeg, int degrees) {
@@ -577,6 +637,113 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             if (m == 60) { d++; m = 0; }
             var fmt = degrees == 3 ? $"{d:D3}" : $"{d:D2}";
             return $"{sign}{fmt}*{m:D2}:{s:D2}";
+        }
+
+        // ── Sky Model Management ─────────────────────────────────────────────────
+
+        private async Task LoadModelFromMountAsync() {
+            try {
+                StatusMessage = "Reading coefficients from mount…";
+                var loaded = await _mount.GetCoefficientsAsync(CancellationToken.None);
+                if (loaded != null) {
+                    Coefficients  = loaded;
+                    StatusMessage = $"Model loaded from mount — {loaded.Stars} stars.";
+                } else {
+                    StatusMessage = "Mount returned no coefficient data.";
+                }
+            } catch (Exception ex) {
+                Logger.Error($"LoadModelFromMount: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        private void LoadModel() {
+            var dlg = new OpenFileDialog { Filter = "JSON|*.json", Title = "Load Model" };
+            if (dlg.ShowDialog() != true) return;
+            try {
+                var loaded = JsonConvert.DeserializeObject<AlignmentModelCoefficients>(File.ReadAllText(dlg.FileName));
+                if (loaded != null) {
+                    Coefficients  = loaded;
+                    StatusMessage = $"Model loaded — {loaded.Stars} stars.";
+                } else {
+                    StatusMessage = "File did not contain a valid model.";
+                }
+            } catch (Exception ex) {
+                StatusMessage = $"Load failed: {ex.Message}";
+            }
+        }
+
+        private async Task WriteCoefficientsAsync() {
+            if (_coefficients == null) return;
+            try {
+                StatusMessage = "Writing coefficients to mount…";
+                await _mount.WriteCoefficientsAsync(_coefficients);
+                StatusMessage = "Coefficients written.";
+            } catch (Exception ex) {
+                Logger.Error($"WriteCoefficients: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        private async Task WriteToEepromAsync() {
+            if (_coefficients == null) return;
+            try {
+                StatusMessage = "Writing coefficients…";
+                await _mount.WriteCoefficientsAsync(_coefficients);
+                StatusMessage = "Saving to EEPROM…";
+                await _mount.SaveAlignmentToEepromAsync();
+                StatusMessage = "Model saved to EEPROM.";
+            } catch (Exception ex) {
+                Logger.Error($"WriteToEeprom: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        private async Task ForceModelActivationAsync() {
+            try {
+                await _mount.ForceModelActivationAsync();
+                StatusMessage = "Model activation forced (:SX09,2#).";
+            } catch (Exception ex) {
+                Logger.Error($"ForceModelActivation: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        private void SaveModel() {
+            if (_coefficients == null) return;
+            var dlg = new SaveFileDialog { Filter = "JSON|*.json", Title = "Save Model" };
+            if (dlg.ShowDialog() != true) return;
+            File.WriteAllText(dlg.FileName, JsonConvert.SerializeObject(_coefficients, Formatting.Indented));
+        }
+
+        private void ZeroCoefficients() {
+            Coefficients = new AlignmentModelCoefficients();
+        }
+
+        private async Task ClearModelAsync() {
+            try {
+                StatusMessage = "Clearing alignment model…";
+                await _mount.ClearAlignmentModelAsync();
+                ZeroCoefficients();
+                StatusMessage = "Alignment model cleared.";
+            } catch (Exception ex) {
+                Logger.Error($"ClearModel: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        private async Task ClearModelFromEepromAsync() {
+            try {
+                StatusMessage = "Clearing alignment model…";
+                await _mount.ClearAlignmentModelAsync();
+                ZeroCoefficients();
+                StatusMessage = "Saving cleared model to EEPROM…";
+                await _mount.SaveAlignmentToEepromAsync();
+                StatusMessage = "Cleared model saved to EEPROM.";
+            } catch (Exception ex) {
+                Logger.Error($"ClearModelFromEeprom: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
         }
 
         public void Dispose() {

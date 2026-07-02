@@ -50,8 +50,6 @@
                                         ToolTip="Export the current point list to a JSON file"/>
                                 <Button Content="Load Points" Command="{Binding LoadPointsCommand}" Width="80" Margin="0,0,6,0"
                                         ToolTip="Import a point list from a JSON file"/>
-                                <Button Content="Load Model…" Command="{Binding LoadModelCommand}"
-                                        ToolTip="Load model coefficients from a JSON file"/>
                             </StackPanel>
 
                             <Expander Header="Advanced parameters" IsExpanded="False" Margin="0,0,0,8">
@@ -348,6 +346,12 @@
                                     <Button Content="Save Model…" Command="{Binding SaveModelCommand}"
                                             Padding="4,3" FontSize="11" Margin="0,0,4,0"
                                             ToolTip="Save the current model coefficients to a JSON file"/>
+                                    <Button Content="Clear Model" Command="{Binding ClearModelCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Resets all the model values to 0.0, functionaly clearing the model"/>
+                                    <Button Content="Clear Model from EEPROM" Command="{Binding ClearModelfromEepromCommand}"
+                                            Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                            ToolTip="Writes 0.0 values to the EEPROM, the mount will load an empty model at next boot"/>
                                 </StackPanel>
 
                                 <TextBlock Text="{Binding BuildStatusMessage}" FontSize="10"

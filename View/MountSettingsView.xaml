@@ -70,9 +70,9 @@
                             <StackPanel Orientation="Horizontal" Margin="0,2">
                                 <TextBlock Text="State:" Width="90" VerticalAlignment="Center"/>
                                 <Button Content="ON"  Command="{Binding TrackOnCommand}"  Width="50" Margin="0,0,4,0"
-                                        ToolTip="Enable sky tracking (:Te#)"/>
+                                        ToolTip="Enable sky tracking (:Te#)" Background="#1a3a1a"/>
                                 <Button Content="OFF" Command="{Binding TrackOffCommand}" Width="50"
-                                        ToolTip="Disable sky tracking (:Td#)"/>
+                                        ToolTip="Disable sky tracking (:Td#)" Background="#3a1a1a"/>
                                 <TextBlock Text="{Binding TrackingEnabled, StringFormat='  {0}'}"
                                            VerticalAlignment="Center" Margin="6,0,0,0"/>
                             </StackPanel>
@@ -93,12 +93,24 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="Compensation:" Width="90" VerticalAlignment="Center"
-                                           ToolTip="Atmospheric refraction compensation applied to the tracking rate"/>
+                                           ToolTip="Atmospheric refraction or model compensation applied to the tracking rate"/>
                                 <ComboBox Width="150" SelectedValue="{Binding CompensatedTracking}" SelectedValuePath="Tag" Margin="0,0,6,0"
                                           ToolTip="Off = no compensation. Refraction Only = corrects atmospheric bending. Full = refraction + model.">
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Off}">Off</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.RefractionOnly}">Refraction only</ComboBoxItem>
-                                    <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full model</ComboBoxItem>
+                                </ComboBox>
+                                <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
+                                        ToolTip="Apply compensation mode (:Tn# / :T1# / :T2#)"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Axis:" Width="90" VerticalAlignment="Center"
+                                           ToolTip="Atmospheric refraction compensation applied to axis"/>
+                                <ComboBox Width="150" SelectedValue="{Binding CompensatedTrackingAxis}" SelectedValuePath="Tag" Margin="0,0,6,0"
+                                          ToolTip="Single = applies only to RA. Dual = applies to RA and DEC.">
+                                    <ComboBoxItem Tag="{x:Static model:CompensatedTrackingAxis.Single}">Single</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:CompensatedTrackingAxis.Dual}">Dual</ComboBoxItem>
                                 </ComboBox>
                                 <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
                                         ToolTip="Apply compensation mode (:Tn# / :T1# / :T2#)"/>
@@ -186,25 +198,178 @@
                                     <ComboBoxItem Tag="{x:Static model:PreferredPierSide.Best}">Best</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:PreferredPierSide.West}">West</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:PreferredPierSide.East}">East</ComboBoxItem>
+                                    <ComboBoxItem Tag="{x:Static model:PreferredPierSide.Auto}">Auto</ComboBoxItem>
                                 </ComboBox>
                             </StackPanel>
 
                             <WrapPanel Margin="0,8,0,0">
-                                <Button Content="Apply Meridian Settings"
+                                <Button Content="Apply Settings"
                                         Command="{Binding SetMeridianSettingsCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
-                                        ToolTip="Write all four meridian/buzzer settings to the mount (:SXE5–8#)"/>
+                                        ToolTip="Write all four meridian/buzzer settings to the mount"/>
                                 <Button Content="Trigger Flip Now"
                                         Command="{Binding TriggerMeridianFlipCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
                                         ToolTip="Force a meridian flip immediately — mount slews to the opposite pier side (:Mf#)"/>
                                 <Button Content="Set Park Position"
                                         Command="{Binding SetParkCommand}"
-                                        Padding="6,3"
+                                        Padding="6,3" Margin="0,0,6,0"
                                         ToolTip="Save the current mount position as the park position (:hQ#)"/>
+                                <Button Content="Set Home Position"
+                                        Command="{Binding SetHomeCommand}"
+                                        Padding="6,3"
+                                        ToolTip="Save the current mount position as the home position (:FH#)"/>
                             </WrapPanel>
 
                         </StackPanel>
+                    </GroupBox>
+
+                    <!-- Model Management -->
+                    <GroupBox Header="Sky Model Management" Margin="0,0,0,4"
+                              ToolTip="Tools to manage the currently loaded model">
+                        <StackPanel Margin="6,4">
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Button Content="Clear Model" Command="{Binding ClearModelCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Resets all the model values to 0.0, functionaly clearing the model"/>
+                                <Button Content="Clear Model from EEPROM" Command="{Binding ClearModelfromEepromCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Writes 0.0 values to the EEPROM, the mount will load an empty model at next boot"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Button Content="Get Model from mount" Command="{Binding LoadModelFromMountCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Load model coefficients stored on the mount"/>
+                                <Button Content="Load Model from file…" Command="{Binding LoadModelCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Load model coefficients from a JSON file"/>
+                            </StackPanel>
+
+                    <!-- ═══ Model coefficients ════════════════════════════════════════ -->
+                            <Border
+                                    BorderThickness="1" CornerRadius="3" Padding="6,4" Margin="0,12,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Pointing Model Coefficients" FontWeight="Bold" FontSize="11"
+                                            Margin="0,0,0,6"
+                                            ToolTip="12-parameter OnStepX pointing model. All values in arcseconds except hcp/dcp which are in degrees."/>
+
+                                    <!-- 2×6 coefficient table -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Row 0 -->
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="ax1:" Width="28" FontSize="11" ToolTip="HA index error (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.Ax1Cor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
+                                            <TextBlock Text="ax2:" Width="28" FontSize="11" ToolTip="Dec index error (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.Ax2Cor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+
+                                        <!-- Row 1 -->
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="alt:" Width="28" FontSize="11" ToolTip="Polar altitude error (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.AltCor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
+                                            <TextBlock Text="azm:" Width="28" FontSize="11" ToolTip="Polar azimuth error (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.AzmCor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+
+                                        <!-- Row 2 -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="do:" Width="28" FontSize="11" ToolTip="Dec/HA orthogonality (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.DoCor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
+                                            <TextBlock Text="pd:" Width="28" FontSize="11" ToolTip="Polar Dec misalignment (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.PdCor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+
+                                        <!-- Row 3 -->
+                                        <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="df:" Width="28" FontSize="11" ToolTip="Dec flexure (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.DfCor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
+                                            <TextBlock Text="tf:" Width="28" FontSize="11" ToolTip="Tube/fork flexure (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.TfCor, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+
+                                        <!-- Row 4 -->
+                                        <StackPanel Grid.Row="4" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="hcp:" Width="28" FontSize="11" ToolTip="HA cosine phase (degrees)"/>
+                                            <TextBlock Text="{Binding Coefficients.Hcp, StringFormat='{}{0:F2}'}" FontSize="11"/>
+                                            <TextBlock Text="°" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
+                                            <TextBlock Text="hca:" Width="28" FontSize="11" ToolTip="HA cosine amplitude (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.Hca, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+
+                                        <!-- Row 5 -->
+                                        <StackPanel Grid.Row="5" Grid.Column="0" Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="dcp:" Width="28" FontSize="11" ToolTip="Dec cosine phase (degrees)"/>
+                                            <TextBlock Text="{Binding Coefficients.Dcp, StringFormat='{}{0:F2}'}" FontSize="11"/>
+                                            <TextBlock Text="°" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="4,2,0,2">
+                                            <TextBlock Text="dca:" Width="28" FontSize="11" ToolTip="Dec cosine amplitude (arcseconds)"/>
+                                            <TextBlock Text="{Binding Coefficients.Dca, StringFormat='{}{0:F1}'}" FontSize="11"/>
+                                            <TextBlock Text="&quot;" FontSize="11"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding Coefficients.Stars, StringFormat='From {0} stars'}"
+                                            FontSize="10" Margin="0,4,0,0"
+                                            ToolTip="Number of alignment stars used to compute this model"/>
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Button Content="Write to Mount" Command="{Binding WriteToMountCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Upload the loaded pointing model coefficients to the mount controller"/>
+                                <Button Content="Push to EEPROM" Command="{Binding WriteToEepromCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Write coefficients to the mount and persist them to EEPROM (:AW#)"/>
+                                <Button Content="Force Activate" Command="{Binding ForceActivationCommand}"
+                                        Padding="4,3" FontSize="11"
+                                        ToolTip="Force the mount to activate the current model (:SX09,2#)"/>
+                            </StackPanel>
+
+                            <!-- Model file actions -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <Button Content="Save Model to File…" Command="{Binding SaveModelCommand}"
+                                        Padding="4,3" FontSize="11" Margin="0,0,4,0"
+                                        ToolTip="Save the current model coefficients to a JSON file"/>
+                            </StackPanel>
+
+                        </StackPanel>
+
                     </GroupBox>
 
                 </StackPanel>
@@ -309,7 +474,7 @@
                                         Padding="6,2" Margin="0,0,8,0"
                                         ToolTip="Send :ERESET# — mount will disconnect and reconnect"/>
                                 <TextBlock Text="⚠ Mount will disconnect" VerticalAlignment="Center"
-                                           FontSize="10"/>
+                                           FontSize="10" Foreground="Orange"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>

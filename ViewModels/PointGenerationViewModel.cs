@@ -91,17 +91,19 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             _builderMediator.ProgressChanged += OnProgressChanged;
             _builderMediator.BuildCompleted  += OnBuildCompleted;
 
-            SavePointsCommand        = new RelayCommand(_ => SavePoints(),      _ => _points.Count > 0);
-            LoadPointsCommand        = new RelayCommand(_ => LoadPoints());
-            StartBuildCommand        = new RelayCommand(async _ => await StartBuildAsync(),
-                                           _ => _plannedPoints.Count > 0 && !_isBuilding
+            SavePointsCommand             = new RelayCommand(_ => SavePoints(),      _ => _points.Count > 0);
+            LoadPointsCommand             = new RelayCommand(_ => LoadPoints());
+            StartBuildCommand             = new RelayCommand(async _ => await StartBuildAsync(),
+                                            _ => _plannedPoints.Count > 0 && !_isBuilding
                                                 && _mountConnected && _camera.GetInfo().Connected);
-            CancelBuildCommand       = new RelayCommand(_ => _buildCts?.Cancel(), _ => _isBuilding);
-            WriteToMountCommand      = new RelayCommand(async _ => await WriteCoefficientsAsync(), _ => _coefficients != null);
-            WriteToEepromCommand     = new RelayCommand(async _ => await WriteToEepromAsync(),     _ => _coefficients != null && _mountConnected);
-            SaveModelCommand         = new RelayCommand(_ => SaveModel(),       _ => _coefficients != null);
-            LoadModelCommand         = new RelayCommand(_ => LoadModel());
-            ForceActivationCommand   = new RelayCommand(async _ => await ForceModelActivationAsync(), _ => _mountConnected);
+            CancelBuildCommand            = new RelayCommand(_ => _buildCts?.Cancel(), _ => _isBuilding);
+            WriteToMountCommand           = new RelayCommand(async _ => await WriteCoefficientsAsync(), _ => _coefficients != null && _mountConnected);
+            WriteToEepromCommand          = new RelayCommand(async _ => await WriteToEepromAsync(),     _ => _coefficients != null && _mountConnected);
+            SaveModelCommand              = new RelayCommand(_ => SaveModel(),       _ => _coefficients != null);
+            LoadModelCommand              = new RelayCommand(_ => LoadModel());
+            ForceActivationCommand        = new RelayCommand(async _ => await ForceModelActivationAsync(), _ => _mountConnected);
+            ClearModelCommand             = new RelayCommand(async _ => await ClearModelAsync(), _ => _mountConnected);
+            ClearModelfromEepromCommand   = new RelayCommand(async _ => await ClearModelFromEepromAsync(), _ => _mountConnected);
 
             Generate();
         }
@@ -286,15 +288,17 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // ── Commands ─────────────────────────────────────────────────────────────
 
-        public ICommand SavePointsCommand      { get; }
-        public ICommand LoadPointsCommand      { get; }
-        public ICommand StartBuildCommand      { get; }
-        public ICommand CancelBuildCommand     { get; }
-        public ICommand WriteToMountCommand    { get; }
-        public ICommand WriteToEepromCommand   { get; }
-        public ICommand SaveModelCommand       { get; }
-        public ICommand LoadModelCommand       { get; }
-        public ICommand ForceActivationCommand { get; }
+        public ICommand SavePointsCommand           { get; }
+        public ICommand LoadPointsCommand           { get; }
+        public ICommand StartBuildCommand           { get; }
+        public ICommand CancelBuildCommand          { get; }
+        public ICommand WriteToMountCommand         { get; }
+        public ICommand WriteToEepromCommand        { get; }
+        public ICommand SaveModelCommand            { get; }
+        public ICommand LoadModelCommand            { get; }
+        public ICommand ForceActivationCommand      { get; }
+        public ICommand ClearModelCommand           { get; }
+        public ICommand ClearModelfromEepromCommand { get; }
 
         // ── ITelescopeConsumer ───────────────────────────────────────────────────
 
@@ -474,6 +478,38 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 BuildStatusMessage = "Model activation forced (:SX09,2#).";
             } catch (Exception ex) {
                 Logger.Error($"ForceModelActivation: {ex.Message}");
+                BuildStatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        // Resets all 12 coefficients to zero in the ViewModel so the display
+        // reflects the cleared state without requiring a reload from the mount.
+        private void ZeroCoefficients() {
+            Coefficients = new AlignmentModelCoefficients();
+        }
+
+        private async Task ClearModelAsync() {
+            try {
+                BuildStatusMessage = "Clearing alignment model…";
+                await _mount.ClearAlignmentModelAsync();
+                ZeroCoefficients();
+                BuildStatusMessage = "Alignment model cleared.";
+            } catch (Exception ex) {
+                Logger.Error($"ClearModel: {ex.Message}");
+                BuildStatusMessage = $"Error: {ex.Message}";
+            }
+        }
+
+        private async Task ClearModelFromEepromAsync() {
+            try {
+                BuildStatusMessage = "Clearing alignment model…";
+                await _mount.ClearAlignmentModelAsync();
+                ZeroCoefficients();
+                BuildStatusMessage = "Saving cleared model to EEPROM…";
+                await _mount.SaveAlignmentToEepromAsync();
+                BuildStatusMessage = "Cleared model saved to EEPROM.";
+            } catch (Exception ex) {
+                Logger.Error($"ClearModelFromEeprom: {ex.Message}");
                 BuildStatusMessage = $"Error: {ex.Message}";
             }
         }
