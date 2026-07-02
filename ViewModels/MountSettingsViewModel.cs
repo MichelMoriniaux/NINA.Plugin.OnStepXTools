@@ -184,6 +184,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public ICommand TriggerMeridianFlipCommand { get; private set; } = null!;
         public ICommand SetParkCommand           { get; private set; } = null!;
         public ICommand SetHomeCommand           { get; private set; } = null!;
+        public ICommand SetEncoderOriginCommand  { get; private set; } = null!;
         public ICommand SetBacklashCommand       { get; private set; } = null!;
         public ICommand SetLimitsCommand         { get; private set; } = null!;
         public ICommand SyncSiteFromNinaCommand  { get; private set; } = null!;
@@ -297,6 +298,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             SetHomeCommand = new RelayCommand(_ => {
                 SendBlind(":FH#");
                 StatusMessage = "Home position set to current.";
+            }, _ => Connected());
+
+            SetEncoderOriginCommand = new RelayCommand(_ => {
+                SendBlind(":SEO#");
+                StatusMessage = "Encoder origin position set to current.";
             }, _ => Connected());
 
             SetBacklashCommand = new RelayCommand(_ => {
@@ -444,7 +450,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         }
 
         // ── Axis config load ─────────────────────────────────────────────────────
-
+        // TODO support more axis , here we do 2 but OnStep supports up to 9
         private async Task LoadAxisConfigAsync() {
             bool useOld = IsOldFormat;
             StatusMessage = useOld

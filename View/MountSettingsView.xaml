@@ -219,6 +219,10 @@
                                         Command="{Binding SetHomeCommand}"
                                         Padding="6,3"
                                         ToolTip="Save the current mount position as the home position (:FH#)"/>
+                                <Button Content="Set Encoder Origin"
+                                        Command="{Binding SetEncoderOriginCommand}"
+                                        Padding="6,3"
+                                        ToolTip="Save the current mount position as the absolute encoders origin position (:SEO#)"/>
                             </WrapPanel>
 
                         </StackPanel>
