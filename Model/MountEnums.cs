@@ -6,9 +6,11 @@ namespace NINA.Plugin.OnStepXTools.Model {
 
     public enum CompensatedTracking { Off, RefractionOnly, Full }
 
+    public enum CompensatedTrackingAxis { Single, Dual }
+
     public enum SlewSpeed { VSlow, Slow, Normal, Fast, VFast }
 
-    public enum PreferredPierSide { Best = 0, West = 1, East = 2 }
+    public enum PreferredPierSide { Best, West, East, Auto }
 
     public enum ServoCalibrationCommand {
         TrackNormally,
