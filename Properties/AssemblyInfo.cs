@@ -8,8 +8,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCompany("Michel Moriniaux")]
 [assembly: AssemblyProduct("NINA.Plugin.OnStepXTools")]
 [assembly: AssemblyCopyright("Copyright © 2026")]
-[assembly: AssemblyVersion("1.0.1.3")]
-[assembly: AssemblyFileVersion("1.0.1.3")]
+[assembly: AssemblyVersion("1.0.1.4")]
+[assembly: AssemblyFileVersion("1.0.1.4")]
 [assembly: ComVisible(false)]
 
 // NINA metadata - MinimumApplicationVersion is a load-time gate; must match the Plugins subfolder name
