@@ -26,7 +26,8 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
 
         public Task<AlignmentModelCoefficients?> GetCoefficientsAsync(CancellationToken ct = default) {
             return Task.Run( async () => {
-                // Coefficient hex indices 0–b; 8=hcp(°), a=dcp(°), others arcseconds
+                // Coefficient hex indices match OnStepX :GX0n#/:SX0n,v#.
+                // dfCor is exposed at 06 for FORK/ALTAZM and 07 for GEM-style mounts.
                 var c = new AlignmentModelCoefficients();
                 var mountType = await GetMountTypeAsync(ct);
                 c.Ax1Cor = ParseInt(_cmd.SendString(":GX00#")) ?? 0;
@@ -35,16 +36,16 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 c.AzmCor = ParseInt(_cmd.SendString(":GX03#")) ?? 0;
                 c.DoCor  = ParseInt(_cmd.SendString(":GX04#")) ?? 0;
                 c.PdCor  = ParseInt(_cmd.SendString(":GX05#")) ?? 0;
-                if ( mountType == MountType.EQFork || mountType == MountType.AltAz )
+                if (IsForkOrAltAz(mountType))
                     c.DfCor  = ParseInt(_cmd.SendString(":GX06#")) ?? 0;
-                if ( mountType != MountType.EQFork && mountType != MountType.AltAz )
+                else
                     c.DfCor  = ParseInt(_cmd.SendString(":GX07#")) ?? 0;
                 c.TfCor  = ParseInt(_cmd.SendString(":GX08#")) ?? 0;
                 c.Hcp    = ParseInt(_cmd.SendString(":GX0a#")) ?? 0;
                 c.Hca    = ParseInt(_cmd.SendString(":GX0b#")) ?? 0;
                 c.Dcp    = ParseInt(_cmd.SendString(":GX0c#")) ?? 0;
                 c.Dca    = ParseInt(_cmd.SendString(":GX0d#")) ?? 0;
-                // c.Stars  = ParseInt(_cmd.SendString(":GX09#")) ?? 0;
+                c.Stars  = ParseInt(_cmd.SendString(":GX09#")) ?? 0; // :GX09# also returns star count
                 return (AlignmentModelCoefficients?)c;
             }, ct);
         }
@@ -244,9 +245,9 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 SendAck($":SX03,{V(c.AzmCor)}#");
                 SendAck($":SX04,{V(c.DoCor)}#");
                 SendAck($":SX05,{V(c.PdCor)}#");
-                if ( mountType == MountType.EQFork || mountType == MountType.AltAz )
+                if (IsForkOrAltAz(mountType))
                     SendAck($":SX06,{V(c.DfCor)}#");
-                if ( mountType != MountType.EQFork && mountType != MountType.AltAz )
+                else
                     SendAck($":SX07,{V(c.DfCor)}#");
                 SendAck($":SX08,{V(c.TfCor)}#");
                 SendAck($":SX0a,{V(c.Hcp)}#");
@@ -298,6 +299,13 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             if (s == null) return null;
             return int.TryParse(s, out var v) ? v : null;
         }
+
+        private static bool IsForkOrAltAz(MountType mountType) =>
+            mountType == MountType.Fork ||
+            mountType == MountType.Fork_TA ||
+            mountType == MountType.Fork_TAC ||
+            mountType == MountType.AltAz ||
+            mountType == MountType.AltAz_Unlimited;
 
         private static string FormatDMS(double deg) {
             var sign = deg < 0 ? "-" : "+";
