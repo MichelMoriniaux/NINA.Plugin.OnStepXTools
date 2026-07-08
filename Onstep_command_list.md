@@ -53,9 +53,9 @@ These commands live in the Ascom Driver
 | `:GX9C#` | `n.n#` | Relative humidity in percent | Implemeted |
 | `:GX9E#` | `sn.n#` | Dew point in C | Implemeted |
 | `:GX9F#` | `n#` or `0` | MCU temperature in C | TODO |
-| `:SX9A,sn.n#` | `0/1` | Set ambient temperature | TODO: plugin uses the values provided by the mount and fallback on N.I.N.A weather, this would be useful to set the refraction model |
-| `:SX9B,n.n#` | `0/1` | Set pressure | TODO: plugin uses the values provided by the mount and fallback on N.I.N.A weather, this would be useful to set the refraction model |
-| `:SX9C,n.n#` | `0/1` | Set humidity | TODO: plugin uses the values provided by the mount and fallback on N.I.N.A weather, this would be useful to set the refraction model |
+| `:SX9A,sn.n#` | `0/1` | Set ambient temperature | TODO: plugin uses the values provided by the mount and fallback on N.I.N.A weather, this would be useful to set the refraction model if there is no sensor |
+| `:SX9B,n.n#` | `0/1` | Set pressure | TODO: plugin uses the values provided by the mount and fallback on N.I.N.A weather, this would be useful to set the refraction model if there is no sensor |
+| `:SX9C,n.n#` | `0/1` | Set humidity | TODO: plugin uses the values provided by the mount and fallback on N.I.N.A weather, this would be useful to set the refraction model if there is no sensor |
 
 ## Time / Date / Site
 
@@ -97,7 +97,7 @@ These commands live in the Ascom Driver
 | `:StsDD*MM#` | `0/1` | Set latitude | Ascom |
 | `:StsDD*MM:SS#` | `0/1` | Set latitude | Ascom |
 | `:StsDD*MM:SS.SSS#` | `0/1` | Set latitude | Ascom |
-| `:SUs.s#` | `0/1` | Set DUT1 correction in seconds, nominally `-0.9` to `+0.9` |
+| `:SUs.s#` | `0/1` | Set DUT1 correction in seconds, nominally `-0.9` to `+0.9` | |
 | `:Svsn.n#` | `0/1` | Set elevation in meters | Ascom |
 | `:W0#` .. `:W3#` | none | Select active site slot | out of scope |
 | `:W?#` | `n#` | Query active site slot | out of scope |
@@ -236,7 +236,7 @@ These commands live in the Ascom Driver
 | `:SX0B,sDD*MM:SS#` | `0/1` | Upload actual Dec for current star | Implemented |
 | `:SX0C,HH:MM:SS#` | `0/1` | Upload mount HA for current star | Implemented |
 | `:SX0D,sDD*MM:SS#` | `0/1` | Upload mount Dec for current star | Implemented |
-| `:SX0E,n#` | `0/1` | Upload pier side and advance to next star | Out Of Scope |
+| `:SX0E,n#` | `0/1` | Upload pier side and advance to next star | Implemented |
 
 ### Goto Extended Settings
 
@@ -337,9 +337,9 @@ see [GOTO_NOTES.md](GOTO_NOTES.md#workflow-4-reachability-and-target-unwinding).
 | `:GW#` | 4-char status | Mount type, tracking, parked/home, align-done |
 | `:SX97,0#` | `0/1` | Disable buzzer | Implemented |
 | `:SX97,1#` | `0/1` | Enable buzzer | Implemented |
-| `:SX97,2#` | `0/1` | Beep |
-| `:SX97,3#` | `0/1` | Alert tone |
-| `:SX97,4#` | `0/1` | Click |
+| `:SX97,2#` | `0/1` | Beep | TODO |
+| `:SX97,3#` | `0/1` | Alert tone | TODO |
+| `:SX97,4#` | `0/1` | Click | TODO |
 
 #### `:GU#` Status Characters
 
@@ -421,26 +421,26 @@ Available when PEC support is enabled for axis 1.
 
 | Command | Reply | Description | Plugin status |
 | --- | --- | --- | --- |
-| `:GX91#` | `n#` | PEC analog value |
-| `:GXE6#` | `n.nnnnnn#` | Steps per sidereal second |
-| `:GXE7#` | `n#` | Worm rotation steps from NV |
-| `:GXE8#` | `n#` | PEC buffer size in seconds |
-| `:SXE7,n#` | `0/1` | Set worm rotation steps |
-| `:VH#` | `nnnnn#` | PEC index sense position in sidereal seconds |
-| `:VR#` | `snnn,nnn#` | Current PEC segment correction plus segment index |
-| `:VRn#` | `snnn#` | PEC correction for segment `n` |
-| `:Vrn#` | `x0x1...x9#` | Ten-byte hex frame of PEC data starting at segment `n` |
-| `:VS#` | `n.nnnnnn#` | Steps per sidereal second of worm rotation |
-| `:VW#` | `nnnnnn#` | Worm rotation steps |
-| `:WR+#` | `0/1` | Rotate PEC table forward one second |
-| `:WR-#` | `0/1` | Rotate PEC table backward one second |
-| `:WRn,sn#` | none | Write PEC correction for segment `n` |
-| `:$QZ+#` | none | Enable PEC playback |
-| `:$QZ-#` | none | Disable PEC |
-| `:$QZ/#` | none | Arm PEC recording |
-| `:$QZZ#` | none | Clear PEC buffer |
-| `:$QZ!#` | none | Save PEC data to NV |
-| `:$QZ?#` | `I#`, `p#`, `P#`, `r#`, `R#`, optionally with `.#` | PEC status |
+| `:GX91#` | `n#` | PEC analog value | TODO |
+| `:GXE6#` | `n.nnnnnn#` | Steps per sidereal second | TODO |
+| `:GXE7#` | `n#` | Worm rotation steps from NV | TODO |
+| `:GXE8#` | `n#` | PEC buffer size in seconds | TODO |
+| `:SXE7,n#` | `0/1` | Set worm rotation steps | TODO |
+| `:VH#` | `nnnnn#` | PEC index sense position in sidereal seconds | TODO |
+| `:VR#` | `snnn,nnn#` | Current PEC segment correction plus segment index | TODO |
+| `:VRn#` | `snnn#` | PEC correction for segment `n` | TODO |
+| `:Vrn#` | `x0x1...x9#` | Ten-byte hex frame of PEC data starting at segment `n` | TODO |
+| `:VS#` | `n.nnnnnn#` | Steps per sidereal second of worm rotation | TODO |
+| `:VW#` | `nnnnnn#` | Worm rotation steps | TODO |
+| `:WR+#` | `0/1` | Rotate PEC table forward one second | TODO |
+| `:WR-#` | `0/1` | Rotate PEC table backward one second | TODO |
+| `:WRn,sn#` | none | Write PEC correction for segment `n` | TODO |
+| `:$QZ+#` | none | Enable PEC playback | TODO |
+| `:$QZ-#` | none | Disable PEC | TODO |
+| `:$QZ/#` | none | Arm PEC recording | TODO |
+| `:$QZZ#` | none | Clear PEC buffer | TODO |
+| `:$QZ!#` | none | Save PEC data to NV | TODO |
+| `:$QZ?#` | `I#`, `p#`, `P#`, `r#`, `R#`, optionally with `.#` | PEC status | TODO |
 
 PEC status characters from `:$QZ?#`:
 
@@ -633,14 +633,14 @@ Axis service commands are implemented by `Axis.command.cpp`. For the main telesc
 | Command | Reply | Description | Plugin status |
 | --- | --- | --- | --- |
 | `:GXAa,p#` | `value,min,max,type,name#` | Get axis parameter `p` for axis `a` (`1..9`) | Implemented |
-| `:GXAa,M#` | `name#` | Motor/driver name for axis `a` |
-| `:GXAa,0#` | `n#` | Parameter count for axis `a` |
-| `:GXSa#` | `delta,velocity#` | Servo-only delta and velocity for axis `a` |
-| `:GXUa#` | `flags#` | Stepper driver status for axis `a` |
-| `:SXAC,0#` | `0/1` | Use runtime NV axis settings |
-| `:SXAC,1#` | `0/1` | Use compile-time `Config.h` axis settings |
-| `:SXAa,R#` | `0/1` | Revert axis `a` settings to defaults on next boot |
-| `:SXAa,p,value#` | `0/1` | Set axis parameter `p` for axis `a` |
+| `:GXAa,M#` | `name#` | Motor/driver name for axis `a` | TODO |
+| `:GXAa,0#` | `n#` | Parameter count for axis `a` | TODO |
+| `:GXSa#` | `delta,velocity#` | Servo-only delta and velocity for axis `a` | TODO |
+| `:GXUa#` | `flags#` | Stepper driver status for axis `a` | TODO |
+| `:SXAC,0#` | `0/1` | Use runtime NV axis settings | TODO |
+| `:SXAC,1#` | `0/1` | Use compile-time `Config.h` axis settings | TODO |
+| `:SXAa,R#` | `0/1` | Revert axis `a` settings to defaults on next boot | Implemented |
+| `:SXAa,p,value#` | `0/1` | Set axis parameter `p` for axis `a` | Implemented |
 
 ### `:GXAa,p#` Reply Format
 

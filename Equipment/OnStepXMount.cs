@@ -153,19 +153,19 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             }), ct);
 
         public Task SetGotoBuzzerAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE5,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX97,{(enabled ? 1 : 0)}#"), ct);
 
         public Task SetAutoMeridianFlipAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE6,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX95,{(enabled ? 1 : 0)}#"), ct);
 
         public Task TriggerMeridianFlipAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(":Mf#"), ct);
 
         public Task SetPauseAtHomeAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE7,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX98,{(enabled ? 1 : 0)}#"), ct);
 
         public Task SetPreferredPierSideAsync(PreferredPierSide side, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE8,{(int)side}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX96,{(int)side}#"), ct);
 
         public Task SetBacklashAsync(int axis1, int axis2, CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind($":SXF5,{axis1}:{axis2}#"), ct);

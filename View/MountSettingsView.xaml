@@ -121,10 +121,10 @@
                                            ToolTip="Fine-tune base tracking frequency by ±0.02 Hz"/>
                                 <Button Content="+0.02 Hz" Command="{Binding FreqPlusCommand}"  Width="72" Margin="0,0,4,0"
                                         ToolTip="Increase tracking frequency by 0.02 Hz (:T+#)"/>
+                                <Button Content="Reset"    Command="{Binding FreqResetCommand}" Width="50" Margin="0,0,4,0"
+                                        ToolTip="Reset to default tracking frequency (:TR#)"/>
                                 <Button Content="−0.02 Hz" Command="{Binding FreqMinusCommand}" Width="72" Margin="0,0,4,0"
                                         ToolTip="Decrease tracking frequency by 0.02 Hz (:T-#)"/>
-                                <Button Content="Reset"    Command="{Binding FreqResetCommand}" Width="50"
-                                        ToolTip="Reset to default tracking frequency (:TR#)"/>
                             </StackPanel>
 
                         </StackPanel>
@@ -171,14 +171,14 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,2">
                                 <TextBlock Text="Auto flip at limit:" Width="160" VerticalAlignment="Center"
-                                           ToolTip="Automatically flip to the other pier side at the meridian limit (:SXE6,n#)"/>
+                                           ToolTip="Automatically flip to the other pier side at the meridian limit (:SX95,n#)"/>
                                 <CheckBox IsChecked="{Binding AutoMeridianFlip}" VerticalAlignment="Center"
                                           ToolTip="Enable automatic meridian flip"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="Pause at home:" Width="160" VerticalAlignment="Center"
-                                           ToolTip="Pause at home switch during meridian flip (:SXE7,n#)"/>
+                                           ToolTip="Pause at home switch during meridian flip (:SX98,n#)"/>
                                 <CheckBox IsChecked="{Binding PauseAtHome}" VerticalAlignment="Center"
                                           ToolTip="Pause at home index position before continuing"/>
                                 <Button Content="Continue Goto"
@@ -189,7 +189,7 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="Goto buzzer:" Width="160" VerticalAlignment="Center"
-                                           ToolTip="Play a beep when a goto slew completes (:SXE5,n#)"/>
+                                           ToolTip="Play a beep when a goto slew completes (:SX97,n#)"/>
                                 <CheckBox IsChecked="{Binding BuzzerEnabled}" VerticalAlignment="Center"
                                           ToolTip="Enable the audible alert at end of goto"/>
                             </StackPanel>
@@ -221,7 +221,7 @@
                                         ToolTip="Save the current mount position as the park position (:hQ#)"/>
                                 <Button Content="Set Home Position"
                                         Command="{Binding SetHomeCommand}"
-                                        Padding="6,3"
+                                        Padding="6,3" Margin="0,0,6,0"
                                         ToolTip="Save the current mount position as the home position (:FH#)"/>
                                 <Button Content="Set Encoder Origin"
                                         Command="{Binding SetEncoderOriginCommand}"
@@ -446,12 +446,12 @@
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Past meridian East (°):" Margin="0,6,8,2" VerticalAlignment="Center" FontSize="11"
                                        ToolTip="How far East of meridian the mount may track before a flip is required (:GXE9#)"/>
-                            <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding LimitEastPastMeridian, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,2"
+                            <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding LimitEastPastMeridian, StringFormat='{}{0:F0}', UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,2"
                                        ToolTip="Degrees East past meridian (0–270°)"/>
 
                             <TextBlock Grid.Row="3" Grid.Column="0" Text="Past meridian West (°):" Margin="0,2,8,2" VerticalAlignment="Center" FontSize="11"
                                        ToolTip="How far West of meridian the mount may track before stopping (:GXEA#)"/>
-                            <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding LimitWestPastMeridian, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
+                            <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding LimitWestPastMeridian, StringFormat='{}{0:F0}', UpdateSourceTrigger=PropertyChanged}" Margin="0,2"
                                        ToolTip="Degrees West past meridian (0–270°)"/>
 
                             <Button Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"

@@ -152,15 +152,15 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // ── Limits ───────────────────────────────────────────────────────────────
 
-        private double _limitMinAlt;
-        private double _limitMaxAlt = 85;
-        private double _limitEastDeg;
-        private double _limitWestDeg = 15;
+        private int _limitMinAlt;
+        private int _limitMaxAlt = 85;
+        private int _limitEastDeg;
+        private int _limitWestDeg = 15;
 
-        public double LimitMinAltDeg        { get => _limitMinAlt;   set => SetProperty(ref _limitMinAlt,   value); }
-        public double LimitMaxAltDeg        { get => _limitMaxAlt;   set => SetProperty(ref _limitMaxAlt,   value); }
-        public double LimitEastPastMeridian { get => _limitEastDeg;  set => SetProperty(ref _limitEastDeg,  value); }
-        public double LimitWestPastMeridian { get => _limitWestDeg;  set => SetProperty(ref _limitWestDeg,  value); }
+        public int LimitMinAltDeg        { get => _limitMinAlt;   set => SetProperty(ref _limitMinAlt,   value); }
+        public int LimitMaxAltDeg        { get => _limitMaxAlt;   set => SetProperty(ref _limitMaxAlt,   value); }
+        public int LimitEastPastMeridian { get => _limitEastDeg;  set => SetProperty(ref _limitEastDeg,  value*60); }
+        public int LimitWestPastMeridian { get => _limitWestDeg;  set => SetProperty(ref _limitWestDeg,  value*60); }
 
         // ── Status ───────────────────────────────────────────────────────────────
 
@@ -281,9 +281,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
             SetMeridianSettingsCommand = new RelayCommand(_ => {
                 SendBlind($":SXE97,{(BuzzerEnabled       ? 1 : 0)}#");
-                SendBlind($":SXE95,{(AutoMeridianFlip    ? 1 : 0)}#");
-                SendBlind($":SXE98,{(PauseAtHome         ? 1 : 0)}#");
-                SendBlind($":SXE96,{PierSideToChar(PreferredPierSide)}#");
+                SendBlind($":SX95,{(AutoMeridianFlip    ? 1 : 0)}#");
+                SendBlind($":SX98,{(PauseAtHome         ? 1 : 0)}#");
+                SendBlind($":SX96,{PierSideToChar(PreferredPierSide)}#");
                 StatusMessage = "Meridian settings updated.";
             }, _ => Connected());
 
@@ -314,10 +314,15 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }, _ => Connected());
 
             SetLimitsCommand = new RelayCommand(_ => {
-                SendBlind($":Sh{(int)LimitMinAltDeg}#");  // TODO this is signed , check if sign is present 
-                SendBlind($":So{(int)LimitMaxAltDeg}#");
-                SendBlind($":SXE9,{LimitEastPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#"); // TODO check if these are in minutes
-                SendBlind($":SXEA,{LimitWestPastMeridian.ToString("F1", CultureInfo.InvariantCulture)}#");
+                if (LimitMinAltDeg >= 0)
+                    SendBlind($":Sh+{LimitMinAltDeg}#");
+                else
+                    SendBlind($":Sh{LimitMinAltDeg}#");
+                SendBlind($":So{LimitMaxAltDeg}#");  // TODO chech that this is <= 90
+                var MerMinutes = LimitEastPastMeridian * 60 / 15;
+                SendBlind($":SXE9,{MerMinutes}#");
+                MerMinutes = LimitWestPastMeridian * 60 / 15;
+                SendBlind($":SXEA,{MerMinutes}#");
                 StatusMessage = "Limits updated.";
             }, _ => Connected());
 
@@ -328,9 +333,12 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     var elev = _telescope.GetInfo().SiteElevation; // mount's current elevation
                     var latCmd = FormatDMSCommand(lat, degrees: 2);
                     var lonCmd = FormatDMSCommand(lon, degrees: 3);
-                    SendBlind($":St{latCmd}#"); // TODO check if these are signed and in H:M:S
-                    SendBlind($":Sg{lonCmd}#"); // TODO check if these are signed and in H:M:S
-                    SendBlind($":Sv{((int)elev)}#"); // TODO check if these are signed and in meters
+                    SendBlind($":St{latCmd}#");
+                    SendBlind($":Sg{lonCmd}#"); // TODO check if these are signed
+                    if ( elev >= 0 )
+                        SendBlind($":Sv+{((int)elev)}#");
+                    else
+                        SendBlind($":Sv{((int)elev)}#");
                     StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F0} m";
                     await Task.Delay(200);
                     await LoadAllSettingsAsync();
@@ -412,7 +420,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                         });
                     }
 
-                    // ─ Preferred pier side (:GXE8#) ─────────────────────────────
+                    // ─ Preferred pier side (:GX96#) ─────────────────────────────
                     var ps = GetStr(":GX96#");
                     if (!string.IsNullOrWhiteSpace(ps))
                         Dispatch(() => PreferredPierSide = PierSideFromChar(ps));
@@ -424,16 +432,20 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                         Dispatch(() => BacklashAxis2Arcsec = bl2);
 
                     // ─ Altitude limits ───────────────────────────────────────────
-                    if (double.TryParse(GetStr(":Gh#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var minAlt))
-                        Dispatch(() => LimitMinAltDeg = minAlt);
-                    if (double.TryParse(GetStr(":Go#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var maxAlt))
-                        Dispatch(() => LimitMaxAltDeg = maxAlt);
+                    var altString = GetStr(":Gh#");
+                    if (!string.IsNullOrWhiteSpace(altString))
+                        if (int.TryParse(altString.Replace("*", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var minAlt))
+                            Dispatch(() => LimitMinAltDeg = minAlt);
+                    altString = GetStr(":Go#");
+                    if (!string.IsNullOrWhiteSpace(altString))
+                        if (int.TryParse(altString.Replace("*", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var maxAlt))
+                            Dispatch(() => LimitMaxAltDeg = maxAlt);
 
                     // ─ Meridian limits ───────────────────────────────────────────
-                    if (double.TryParse(GetStr(":GXE9#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var me))
-                        Dispatch(() => LimitEastPastMeridian = me);
-                    if (double.TryParse(GetStr(":GXEA#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var mw))
-                        Dispatch(() => LimitWestPastMeridian = mw);
+                    if (int.TryParse(GetStr(":GXE9#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var me))
+                        Dispatch(() => LimitEastPastMeridian = me * 15 / 60);
+                    if (int.TryParse(GetStr(":GXEA#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var mw))
+                        Dispatch(() => LimitWestPastMeridian = mw * 15 / 60);
 
                     // ─ Site location (display only - edit via Sync button) ────────
                     var latStr = GetStr(":GtH#");
