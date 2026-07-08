@@ -28,18 +28,18 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             return Task.Run(() => {
                 // Coefficient hex indices 0–b; 8=hcp(°), a=dcp(°), others arcseconds
                 var c = new AlignmentModelCoefficients();
-                c.Ax1Cor = ParseDouble(_cmd.SendString(":GX00#")) ?? 0;
-                c.Ax2Cor = ParseDouble(_cmd.SendString(":GX01#")) ?? 0;
-                c.AltCor = ParseDouble(_cmd.SendString(":GX02#")) ?? 0;
-                c.AzmCor = ParseDouble(_cmd.SendString(":GX03#")) ?? 0;
-                c.DoCor  = ParseDouble(_cmd.SendString(":GX04#")) ?? 0;
-                c.PdCor  = ParseDouble(_cmd.SendString(":GX05#")) ?? 0;
-                c.DfCor  = ParseDouble(_cmd.SendString(":GX06#")) ?? 0;
-                c.TfCor  = ParseDouble(_cmd.SendString(":GX07#")) ?? 0;
-                c.Hcp    = ParseDouble(_cmd.SendString(":GX08#")) ?? 0;
-                c.Hca    = ParseDouble(_cmd.SendString(":GX09#")) ?? 0;
-                c.Dcp    = ParseDouble(_cmd.SendString(":GX0a#")) ?? 0;
-                c.Dca    = ParseDouble(_cmd.SendString(":GX0b#")) ?? 0;
+                c.Ax1Cor = ParseInt(_cmd.SendString(":GX00#")) ?? 0;
+                c.Ax2Cor = ParseInt(_cmd.SendString(":GX01#")) ?? 0;
+                c.AltCor = ParseInt(_cmd.SendString(":GX02#")) ?? 0;
+                c.AzmCor = ParseInt(_cmd.SendString(":GX03#")) ?? 0;
+                c.DoCor  = ParseInt(_cmd.SendString(":GX04#")) ?? 0;
+                c.PdCor  = ParseInt(_cmd.SendString(":GX05#")) ?? 0;
+                c.DfCor  = ParseInt(_cmd.SendString(":GX06#")) ?? 0;
+                c.TfCor  = ParseInt(_cmd.SendString(":GX07#")) ?? 0;
+                c.Hcp    = ParseInt(_cmd.SendString(":GX08#")) ?? 0;
+                c.Hca    = ParseInt(_cmd.SendString(":GX09#")) ?? 0;
+                c.Dcp    = ParseInt(_cmd.SendString(":GX0a#")) ?? 0;
+                c.Dca    = ParseInt(_cmd.SendString(":GX0b#")) ?? 0;
                 c.Stars  = ParseInt(_cmd.SendString(":GX09#")) ?? 0; // :GX09# also returns star count
                 return (AlignmentModelCoefficients?)c;
             }, ct);
@@ -229,7 +229,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
 
         public Task WriteCoefficientsAsync(AlignmentModelCoefficients c, CancellationToken ct = default) {
             return Task.Run(() => {
-                static string V(double v) => v.ToString("F6", CultureInfo.InvariantCulture);
+                static string V(int v) => v.ToString();
                 SendAck($":SX00,{V(c.Ax1Cor)}#");
                 SendAck($":SX01,{V(c.Ax2Cor)}#");
                 SendAck($":SX02,{V(c.AltCor)}#");

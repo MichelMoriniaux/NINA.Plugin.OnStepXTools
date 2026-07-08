@@ -65,7 +65,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         }
 
         // ── ITelescopeConsumer ───────────────────────────────────────────────────
-
+        // TODO: verify how often this is run, most of the values polled should only be pulled once or on demand, not every 2 seconds
         public void UpdateDeviceInfo(TelescopeInfo info) {
             IsConnected = info.Connected;
             if (info.Connected && !_wasConnected) {
@@ -182,6 +182,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public ICommand SetSlewSpeedCommand      { get; private set; } = null!;
         public ICommand SetMeridianSettingsCommand { get; private set; } = null!;
         public ICommand TriggerMeridianFlipCommand { get; private set; } = null!;
+        public ICommand ContinueGotoAfterPauseCommand { get; private set; } = null!;
         public ICommand SetParkCommand           { get; private set; } = null!;
         public ICommand SetHomeCommand           { get; private set; } = null!;
         public ICommand SetEncoderOriginCommand  { get; private set; } = null!;
@@ -192,6 +193,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         // Axis Config commands
         public ICommand SetMountTypeCommand     { get; private set; } = null!;
         public ICommand RebootCommand           { get; private set; } = null!;
+        public ICommand ClearEeprom             { get; private set; } = null!;
         public ICommand SaveAxis1Command        { get; private set; } = null!;
         public ICommand SaveAxis2Command        { get; private set; } = null!;
         public ICommand RevertAxis1Command      { get; private set; } = null!;
@@ -342,6 +344,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             // ── Axis Config commands ─────────────────────────────────────────────
             SetMountTypeCommand = new RelayCommand(_ => { SendBlind($":SXEM,{(int)MountType}#"); StatusMessage = "Mount type set - reboot required."; }, _ => Connected());
             RebootCommand       = new RelayCommand(_ => { SendBlind(":ERESET#"); StatusMessage = "Reboot command sent."; }, _ => Connected());
+            ClearEeprom         = new RelayCommand(_ => { SendBlind(":ENVRESET#"); StatusMessage = "Clear EEPROM command sent."; }, _ => Connected());
+            ContinueGotoAfterPauseCommand = new RelayCommand(_ => { SendBlind(":SX99,1#"); StatusMessage = "Continue Goto after Pause command sent."; }, _ => Connected());
 
             SaveAxis1Command   = new RelayCommand(async _ => await SaveAxisAsync(1, Axis1Params), _ => Connected());
             SaveAxis2Command   = new RelayCommand(async _ => await SaveAxisAsync(2, Axis2Params), _ => Connected());

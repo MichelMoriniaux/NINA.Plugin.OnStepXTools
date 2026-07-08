@@ -181,6 +181,10 @@
                                            ToolTip="Pause at home switch during meridian flip (:SXE7,n#)"/>
                                 <CheckBox IsChecked="{Binding PauseAtHome}" VerticalAlignment="Center"
                                           ToolTip="Pause at home index position before continuing"/>
+                                <Button Content="Continue Goto"
+                                        Command="{Binding ContinueGotoAfterPauseCommand}"
+                                        Padding="6,3" Margin="0,0,6,0"
+                                        ToolTip="Continues the Goto after pause at Home"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
@@ -617,7 +621,14 @@
 
                 </StackPanel>
             </Grid>
-
+            <Expander Header="Advanced commands" IsExpanded="False"
+                      Margin="0,0,0,8">
+                 <StackPanel Orientation="Horizontal" Margin="0,6">
+                    <Button Content="Clear EEPROM" Command="{Binding ClearEeprom}"
+                            Padding="6,3" Margin="0,0,8,0"
+                            ToolTip="Clear the EEPROM at next reboot, THIS WIPES THE CONFIGURATION"/>
+                </StackPanel>
+            </Expander>
             <!-- ── Status bar (full width) ───────────────────────────────────── -->
             <TextBlock Text="{Binding StatusMessage}"
                        Margin="0,4,0,0" FontStyle="Italic" FontSize="11"/>
