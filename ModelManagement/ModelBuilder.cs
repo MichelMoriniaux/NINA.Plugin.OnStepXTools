@@ -128,18 +128,20 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 Logger.Info($"ModelBuilder: {goodPoints.Count} good points → solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
 
                 if (coefficients != null && opts.WriteModelToMountOnCompletion) {
-                    try { await _mount.WriteCoefficientsAsync(coefficients, ct); }
-                    catch (Exception ex) { Logger.Error($"WriteCoefficientsAsync failed: {ex.Message}"); }
+                    await _mount.WriteCoefficientsAsync(coefficients, ct);
                 }
-                if (opts.SaveToEepromOnCompletion) {
-                    try { await _mount.SaveAlignmentToEepromAsync(ct); }
-                    catch (Exception ex) { Logger.Error($"SaveAlignmentToEepromAsync failed: {ex.Message}"); }
+                if (coefficients != null && opts.WriteModelToMountOnCompletion && opts.SaveToEepromOnCompletion) {
+                    await _mount.SaveAlignmentToEepromAsync(ct);
                 }
             } else {
-                if (opts.SaveToEepromOnCompletion) {
-                    try { await _mount.SaveAlignmentToEepromAsync(ct); }
-                    catch (Exception ex) { Logger.Error($"SaveAlignmentToEepromAsync failed: {ex.Message}"); }
-                }
+                var goodIndexes = goodPoints.Select(p => p.Index).ToHashSet();
+                var controllerPoints = points.Where(p => goodIndexes.Contains(p.Index)).ToList();
+                coefficients = await AlignmentUploadOrchestrator.UploadAndComputeAsync(
+                    _mount,
+                    controllerPoints,
+                    opts.SaveToEepromOnCompletion,
+                    delayAsync: null,
+                    ct);
             }
 
             session.Coefficients = coefficients;
@@ -272,17 +274,9 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             Logger.Debug($"  Point {point.Index}: ΔRA={point.PointingErrorRAArcsec:F1}\"  ΔDec={point.PointingErrorDecArcsec:F1}\"");
 
             if (opts.Mode == BuildMode.StarAlignment) {
-                point.State = AlignmentPointState.Uploading;
                 // Use JNOW solved RA for HA computation (lst is also JNOW)
-                double actualHAHours  = lst - point.SolvedRAHours;
-                double actualDecDeg   = point.SolvedDecDeg;
-                double mountHAHours   = point.MountHAHours;
-                double mountDecDeg    = point.MountDecDeg;
-                await _mount.UploadAlignmentStarAsync(
-                    actualHAHours, actualDecDeg,
-                    mountHAHours,  mountDecDeg,
-                    point.PierSide, ct);
-                await _mount.ComputeAlignmentOnControllerAsync(ct);
+                point.ActualHAHours = lst - point.SolvedRAHours;
+                point.ActualDecDeg  = point.SolvedDecDeg;
             }
 
             point.State = AlignmentPointState.Added;
@@ -314,6 +308,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             MountDecDeg              = p.MountDecDeg,
             SolvedRAHours            = p.SolvedRAHours,
             SolvedDecDeg             = p.SolvedDecDeg,
+            ActualHAHours            = p.ActualHAHours,
+            ActualDecDeg             = p.ActualDecDeg,
             PierSide                 = p.PierSide,
             PointingErrorRAArcsec    = p.PointingErrorRAArcsec,
             PointingErrorDecArcsec   = p.PointingErrorDecArcsec

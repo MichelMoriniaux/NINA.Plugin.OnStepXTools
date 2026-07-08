@@ -12,6 +12,8 @@ namespace NINA.Plugin.OnStepXTools.Model {
         [JsonProperty("mountDec")]  public double MountDecDeg { get; set; }
         [JsonProperty("solvedRA")]  public double SolvedRAHours { get; set; }
         [JsonProperty("solvedDec")] public double SolvedDecDeg { get; set; }
+        [JsonProperty("actualHA")]  public double ActualHAHours { get; set; }
+        [JsonProperty("actualDec")] public double ActualDecDeg { get; set; }
         [JsonProperty("pierSide")]  public int PierSide { get; set; }
         [JsonProperty("errRA")]     public double PointingErrorRAArcsec { get; set; }
         [JsonProperty("errDec")]    public double PointingErrorDecArcsec { get; set; }
@@ -23,6 +25,8 @@ namespace NINA.Plugin.OnStepXTools.Model {
             point.MountDecDeg             = MountDecDeg;
             point.SolvedRAHours           = SolvedRAHours;
             point.SolvedDecDeg            = SolvedDecDeg;
+            point.ActualHAHours           = ActualHAHours;
+            point.ActualDecDeg            = ActualDecDeg;
             point.PierSide                = PierSide;
             point.PointingErrorRAArcsec   = PointingErrorRAArcsec;
             point.PointingErrorDecArcsec  = PointingErrorDecArcsec;

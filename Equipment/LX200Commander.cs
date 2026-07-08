@@ -3,13 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using NINA.Core.Utility;
 using NINA.Equipment.Interfaces.Mediator;
+using NINA.Plugin.OnStepXTools.Interfaces;
 
 namespace NINA.Plugin.OnStepXTools.Equipment {
 
     // Wraps ITelescopeMediator.SendCommand*() for raw LX200 serial commands.
     // Commands follow the LX200 protocol: ":CMD<params>#" - response strings end with "#".
     // NOTE: verify exact API against NINA.Plugin 3.2.0.9001 - method names may differ slightly.
-    public class LX200Commander {
+    public class LX200Commander : ILx200Transport {
         private readonly ITelescopeMediator _telescope;
 
         public LX200Commander(ITelescopeMediator telescope) {

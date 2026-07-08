@@ -340,15 +340,16 @@ Key implementation notes:
 | Meridian E limit | `:GXE9#` | `:SXE9,{v}#` |
 | Meridian W limit | `:GXEA#` | `:SXEA,{v}#` |
 | Preferred pier side | `:GX96#` | `:SX96,{v}#` |
+| Goto buzzer | `:GU#` flag | `:SX97,{v}#` |
 | Auto meridian flip | `:GX95#` | `:SX95,{v}#` |
-| Pause at home | `:GX98#` | `:SX98,{v}#` |
+| Pause at home | `:GU#` flag | `:SX98,{v}#` |
 | Axis parameters (≥10.26) | `:GXA{n},{i}#` | `:SXA{n},{i},{v}#` |
 | Weather temp | `:GX9A#` | — |
 | Weather pressure | `:GX9B#` | — |
 | Weather humidity | `:GX9C#` | — |
 | Weather dew point | `:GX9E#` | — |
 | Controller temp | `:GX9F#` | — |
-| Last error | `:GXE0#` | — |
+| Last error | `:GU#` | — |
 
 ---
 

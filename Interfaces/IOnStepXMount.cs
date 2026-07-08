@@ -8,6 +8,9 @@ namespace NINA.Plugin.OnStepXTools.Interfaces {
         // --- Alignment model data ---
         Task<AlignmentModelCoefficients?> GetCoefficientsAsync(CancellationToken ct = default);
         Task<int> GetAlignmentStarCountAsync(CancellationToken ct = default);
+        Task<AlignmentControllerStatus> GetAlignmentControllerStatusAsync(CancellationToken ct = default);
+        Task<MountType> GetMountTypeAsync(CancellationToken ct = default);
+        Task<bool> EnsureModelActivatedAsync(CancellationToken ct = default);
 
         // --- Axis motor configuration (needs hardware verification for exact command format) ---
         Task<AxisConfig?> GetAxisConfigAsync(int axis, CancellationToken ct = default);
@@ -27,6 +30,7 @@ namespace NINA.Plugin.OnStepXTools.Interfaces {
         Task SetCompensatedTrackingAsync(CompensatedTracking mode, bool dualAxis, CancellationToken ct = default);
         Task AdjustTrackingFrequencyAsync(int direction, CancellationToken ct = default); // direction: +1 or -1
         Task ResetTrackingFrequencyAsync(CancellationToken ct = default);
+        Task ResetMountAtHomeAsync(CancellationToken ct = default);
         Task SetParkPositionAsync(CancellationToken ct = default);
         Task SetGuideRateAsync(int rateIndex, CancellationToken ct = default);
         Task SetSlewSpeedAsync(SlewSpeed speed, CancellationToken ct = default);

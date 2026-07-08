@@ -103,8 +103,8 @@
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.RefractionOnly}">Refraction only</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full model</ComboBoxItem>
                                 </ComboBox>
-                                <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
-                                        ToolTip="Apply compensation mode (:Tn# / :T1# / :T2#)"/>
+                                <Button Content="Set" Command="{Binding SetCompTrackAxisCommand}" Width="50"
+                                        ToolTip="Apply compensation axis (:T1# / :T2#)"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
@@ -161,7 +161,7 @@
                                     <ComboBoxItem Tag="{x:Static model:SlewSpeed.VSlow}">V.Slow</ComboBoxItem>
                                 </ComboBox>
                                 <Button Content="Set" Command="{Binding SetSlewSpeedCommand}" Width="50"
-                                        ToolTip="Apply the selected slew speed (:RS0# through :RS4#)"/>
+                                        ToolTip="Apply the selected slew speed (:SX93,n#)"/>
                             </StackPanel>
 
                         </StackPanel>
@@ -199,7 +199,7 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="Preferred pier side:" Width="160" VerticalAlignment="Center"
-                                           ToolTip="Which pier side to prefer after a meridian flip (:SXE8,n#)"/>
+                                           ToolTip="Which pier side to prefer after a meridian flip (:SX96,n#)"/>
                                 <ComboBox Width="80" SelectedValue="{Binding PreferredPierSide}" SelectedValuePath="Tag"
                                           ToolTip="Best = firmware decides. East/West = always flip to that side.">
                                     <ComboBoxItem Tag="{x:Static model:PreferredPierSide.Best}">Best</ComboBoxItem>
@@ -217,7 +217,7 @@
                                 <Button Content="Trigger Flip Now"
                                         Command="{Binding TriggerMeridianFlipCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
-                                        ToolTip="Force a meridian flip immediately — mount slews to the opposite pier side (:Mf#)"/>
+                                        ToolTip="Force a meridian flip immediately; mount slews to the opposite pier side (:MN#)"/>
                                 <Button Content="Set Park Position"
                                         Command="{Binding SetParkCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
@@ -225,7 +225,7 @@
                                 <Button Content="Set Home Position"
                                         Command="{Binding SetHomeCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
-                                        ToolTip="Save the current mount position as the home position (:FH#)"/>
+                                        ToolTip="Save the current mount position as the home position (:hF#)"/>
                                 <Button Content="Set Encoder Origin"
                                         Command="{Binding SetEncoderOriginCommand}"
                                         Padding="6,3"
@@ -467,9 +467,10 @@
                         <StackPanel Margin="6,4">
                             <StackPanel Orientation="Horizontal" Margin="0,2">
                                 <TextBlock Text="Mount type:" Width="90" VerticalAlignment="Center"
-                                           ToolTip="GEM=0, EQ Fork=1, Alt/Az=2. Reboot required after change."/>
+                                           ToolTip="Default=0, GEM=1, Fork=2, Alt/Az=3. Reboot required after change."/>
                                 <ComboBox Width="100" SelectedValue="{Binding MountType}" SelectedValuePath="Tag" Margin="0,0,6,0"
                                           ToolTip="Select the mount geometry. Reboot required after changing.">
+                                    <ComboBoxItem Tag="{x:Static model:MountType.Default}">Default</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:MountType.GEM}">GEM</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:MountType.EQFork}">EQ Fork</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:MountType.AltAz}">Alt/Az</ComboBoxItem>

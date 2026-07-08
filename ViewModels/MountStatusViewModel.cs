@@ -181,7 +181,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 var hum  = GetDouble(":GX9C#");
                 var dew  = GetDouble(":GX9E#");
                 var ctmp = GetDouble(":GX9F#");
-                var err  = GetString(":GXE0#");
+                var err  = GetLastErrorFromGu();
 
                 System.Windows.Application.Current?.Dispatcher.Invoke(() => {
                     if (temp.HasValue) AmbientTemperatureCelsius    = temp.Value;
@@ -210,6 +210,12 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 var r = _telescope.SendCommandString(cmd, raw: true);
                 return string.IsNullOrWhiteSpace(r) ? null : r.TrimEnd('#').Trim();
             } catch { return null; }
+        }
+
+        private string? GetLastErrorFromGu() {
+            var gu = GetString(":GU#");
+            if (string.IsNullOrWhiteSpace(gu)) return null;
+            return gu[^1].ToString(CultureInfo.InvariantCulture);
         }
 
         private static string FormatPierSide(string raw) =>
