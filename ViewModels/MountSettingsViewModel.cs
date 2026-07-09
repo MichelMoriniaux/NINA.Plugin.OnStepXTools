@@ -99,9 +99,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private string _latitudeDMS   = string.Empty;
         private string _longitudeDMS  = string.Empty;
+        private string _elevation  = string.Empty;
 
         public string LatitudeDMS  { get => _latitudeDMS;  private set => SetProperty(ref _latitudeDMS,  value); }
         public string LongitudeDMS { get => _longitudeDMS; private set => SetProperty(ref _longitudeDMS, value); }
+        public string Elevation { get => _elevation; private set => SetProperty(ref _elevation, value); }
 
         // ── Tracking ─────────────────────────────────────────────────────────────
 
@@ -330,7 +332,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 try {
                     var lat  = _profile.ActiveProfile.AstrometrySettings.Latitude;
                     var lon  = _profile.ActiveProfile.AstrometrySettings.Longitude;
-                    var elev = _telescope.GetInfo().SiteElevation; // mount's current elevation
+                    var elev = _telescope.GetInfo().SiteElevation;
                     var latCmd = FormatDMSCommand(lat, degrees: 2);
                     var lonCmd = FormatDMSCommand(lon, degrees: 3);
                     SendBlind($":St{latCmd}#");
@@ -454,6 +456,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                         Dispatch(() => LatitudeDMS  = latStr);
                     if (!string.IsNullOrWhiteSpace(lonStr))
                         Dispatch(() => LongitudeDMS = lonStr);
+                    var elev = _telescope.GetInfo().SiteElevation;
+                    Dispatch(() => Elevation = elev.ToString());
                 });
                 StatusMessage = "Settings loaded.";
             } catch (Exception ex) {
@@ -669,7 +673,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 var loaded = await _mount.GetCoefficientsAsync(CancellationToken.None);
                 if (loaded != null) {
                     Coefficients  = loaded;
-                    StatusMessage = $"Model loaded from mount — {loaded.Stars} stars.";
+                    StatusMessage = $"Model loaded from mount.";
                 } else {
                     StatusMessage = "Mount returned no coefficient data.";
                 }
@@ -686,7 +690,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 var loaded = JsonConvert.DeserializeObject<AlignmentModelCoefficients>(File.ReadAllText(dlg.FileName));
                 if (loaded != null) {
                     Coefficients  = loaded;
-                    StatusMessage = $"Model loaded — {loaded.Stars} stars.";
+                    StatusMessage = $"Model loaded.";
                 } else {
                     StatusMessage = "File did not contain a valid model.";
                 }

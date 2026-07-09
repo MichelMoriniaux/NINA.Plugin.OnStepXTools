@@ -58,6 +58,9 @@
                                 <TextBlock Text="Lon:" Width="28" FontSize="11" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding LongitudeDMS}" FontFamily="Courier New" Margin="2,0,0,0"
                                            VerticalAlignment="Center" FontSize="11"/>
+                                <TextBlock Text="Elevation:" Width="58" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Elevation}" FontFamily="Courier New" Margin="2,0,0,0"
+                                           VerticalAlignment="Center" FontSize="11"/>
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
@@ -351,9 +354,6 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <TextBlock Text="{Binding Coefficients.Stars, StringFormat='From {0} stars'}"
-                                            FontSize="10" Margin="0,4,0,0"
-                                            ToolTip="Number of alignment stars used to compute this model"/>
                                 </StackPanel>
                             </Border>
 

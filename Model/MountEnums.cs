@@ -1,6 +1,18 @@
 namespace NINA.Plugin.OnStepXTools.Model {
 
-    public enum MountType { GEM = 0, EQFork = 1, AltAz = 2 }
+    public enum MountType {
+        Default = 0,
+        GEM = 1,
+        Fork = 2,
+        EQFork = Fork,
+        AltAz = 3,
+        AltAlt = 4,
+        GEM_TA = 5,
+        GEM_TAC = 6,
+        Fork_TA = 7,
+        Fork_TAC = 8,
+        AltAz_Unlimited = 9
+    }
 
     public enum TrackingRate { Sidereal, Lunar, Solar, King }
 

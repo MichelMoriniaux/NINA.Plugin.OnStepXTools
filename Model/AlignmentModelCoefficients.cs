@@ -17,6 +17,6 @@ namespace NINA.Plugin.OnStepXTools.Model {
         [JsonProperty("hca")]    public int Hca    { get; set; }  // index 9
         [JsonProperty("dcp")]    public int Dcp    { get; set; }  // index a - degrees
         [JsonProperty("dca")]    public int Dca    { get; set; }  // index b
-        [JsonProperty("stars")]  public int    Stars  { get; set; }
+        [JsonProperty("stars")]  public int Stars  { get; set; }
     }
 }
