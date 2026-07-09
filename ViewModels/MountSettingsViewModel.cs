@@ -48,6 +48,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         // ── Axis config - firmware version and format detection ────────────────────
         private int  _fwMajor;
         private int  _fwMinor;
+        private bool _fwVersionKnown;
         private char _axis1DriverType;
         private char _axis2DriverType;
         private bool _axis1OldFormat;
@@ -448,7 +449,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             bool useOld = IsOldFormat;
             StatusMessage = useOld
                 ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (pre-10.26 format)…"
-                : $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (per-parameter format)…";
+                : _fwVersionKnown
+                    ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (per-parameter format)…"
+                    : "Firmware version unknown - reading axis config (per-parameter format)…";
             try {
                 await Task.Run(async () => {
                     if (useOld) {
@@ -574,14 +577,16 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }
         }
 
-        private bool IsOldFormat => _fwMajor < 10 || (_fwMajor == 10 && _fwMinor < 26);
+        private bool IsOldFormat => _fwVersionKnown && (_fwMajor < 10 || (_fwMajor == 10 && _fwMinor < 26));
 
         private void ParseFirmwareVersion(string description) {
             _fwMajor = 0; _fwMinor = 0;
+            _fwVersionKnown = false;
             var m = Regex.Match(description, @"(\d+)\.(\d+)", RegexOptions.IgnoreCase);
             if (!m.Success) return;
             int.TryParse(m.Groups[1].Value, out _fwMajor);
             int.TryParse(m.Groups[2].Value, out _fwMinor);
+            _fwVersionKnown = true;
             Logger.Info($"OnStepX firmware v{_fwMajor}.{_fwMinor} - axis format: {(IsOldFormat ? "OLD" : "NEW")}");
         }
 
