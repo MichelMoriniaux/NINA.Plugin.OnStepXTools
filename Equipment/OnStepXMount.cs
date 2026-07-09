@@ -25,22 +25,26 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         // ── Alignment model ──────────────────────────────────────────────────────
 
         public Task<AlignmentModelCoefficients?> GetCoefficientsAsync(CancellationToken ct = default) {
-            return Task.Run(() => {
+            return Task.Run( async () => {
                 // Coefficient hex indices 0–b; 8=hcp(°), a=dcp(°), others arcseconds
                 var c = new AlignmentModelCoefficients();
-                c.Ax1Cor = ParseDouble(_cmd.SendString(":GX00#")) ?? 0;
-                c.Ax2Cor = ParseDouble(_cmd.SendString(":GX01#")) ?? 0;
-                c.AltCor = ParseDouble(_cmd.SendString(":GX02#")) ?? 0;
-                c.AzmCor = ParseDouble(_cmd.SendString(":GX03#")) ?? 0;
-                c.DoCor  = ParseDouble(_cmd.SendString(":GX04#")) ?? 0;
-                c.PdCor  = ParseDouble(_cmd.SendString(":GX05#")) ?? 0;
-                c.DfCor  = ParseDouble(_cmd.SendString(":GX06#")) ?? 0;
-                c.TfCor  = ParseDouble(_cmd.SendString(":GX07#")) ?? 0;
-                c.Hcp    = ParseDouble(_cmd.SendString(":GX08#")) ?? 0;
-                c.Hca    = ParseDouble(_cmd.SendString(":GX09#")) ?? 0;
-                c.Dcp    = ParseDouble(_cmd.SendString(":GX0a#")) ?? 0;
-                c.Dca    = ParseDouble(_cmd.SendString(":GX0b#")) ?? 0;
-                c.Stars  = ParseInt(_cmd.SendString(":GX09#")) ?? 0; // :GX09# also returns star count
+                var mountType = await GetMountTypeAsync(ct);
+                c.Ax1Cor = ParseInt(_cmd.SendString(":GX00#")) ?? 0;
+                c.Ax2Cor = ParseInt(_cmd.SendString(":GX01#")) ?? 0;
+                c.AltCor = ParseInt(_cmd.SendString(":GX02#")) ?? 0;
+                c.AzmCor = ParseInt(_cmd.SendString(":GX03#")) ?? 0;
+                c.DoCor  = ParseInt(_cmd.SendString(":GX04#")) ?? 0;
+                c.PdCor  = ParseInt(_cmd.SendString(":GX05#")) ?? 0;
+                if ( mountType == MountType.EQFork || mountType == MountType.AltAz )
+                    c.DfCor  = ParseInt(_cmd.SendString(":GX06#")) ?? 0;
+                if ( mountType != MountType.EQFork && mountType != MountType.AltAz )
+                    c.DfCor  = ParseInt(_cmd.SendString(":GX07#")) ?? 0;
+                c.TfCor  = ParseInt(_cmd.SendString(":GX08#")) ?? 0;
+                c.Hcp    = ParseInt(_cmd.SendString(":GX0a#")) ?? 0;
+                c.Hca    = ParseInt(_cmd.SendString(":GX0b#")) ?? 0;
+                c.Dcp    = ParseInt(_cmd.SendString(":GX0c#")) ?? 0;
+                c.Dca    = ParseInt(_cmd.SendString(":GX0d#")) ?? 0;
+                // c.Stars  = ParseInt(_cmd.SendString(":GX09#")) ?? 0;
                 return (AlignmentModelCoefficients?)c;
             }, ct);
         }
@@ -76,6 +80,9 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
 
         public Task SetMountTypeAsync(MountType type, CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind($":SXEM,{(int)type}#"), ct);
+
+        public Task<MountType> GetMountTypeAsync(CancellationToken ct = default) =>
+            Task.Run(() => (MountType)(ParseInt(_cmd.SendString($":GXEM#")) ?? 0), ct);
 
         public Task RebootAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(":ERESET#"), ct);
@@ -153,19 +160,19 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             }), ct);
 
         public Task SetGotoBuzzerAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE5,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX97,{(enabled ? 1 : 0)}#"), ct);
 
         public Task SetAutoMeridianFlipAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE6,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX95,{(enabled ? 1 : 0)}#"), ct);
 
         public Task TriggerMeridianFlipAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(":Mf#"), ct);
 
         public Task SetPauseAtHomeAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE7,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX98,{(enabled ? 1 : 0)}#"), ct);
 
         public Task SetPreferredPierSideAsync(PreferredPierSide side, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXE8,{(int)side}#"), ct);
+            Task.Run(() => _cmd.SendBlind($":SX96,{(int)side}#"), ct);
 
         public Task SetBacklashAsync(int axis1, int axis2, CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind($":SXF5,{axis1}:{axis2}#"), ct);
@@ -228,20 +235,24 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             Task.Run(() => SendAck(":SX09,2#"), ct);
 
         public Task WriteCoefficientsAsync(AlignmentModelCoefficients c, CancellationToken ct = default) {
-            return Task.Run(() => {
-                static string V(double v) => v.ToString("F6", CultureInfo.InvariantCulture);
+            return Task.Run( async() => {
+                static string V(int v) => v.ToString();
+                var mountType = await GetMountTypeAsync(ct);
                 SendAck($":SX00,{V(c.Ax1Cor)}#");
                 SendAck($":SX01,{V(c.Ax2Cor)}#");
                 SendAck($":SX02,{V(c.AltCor)}#");
                 SendAck($":SX03,{V(c.AzmCor)}#");
                 SendAck($":SX04,{V(c.DoCor)}#");
                 SendAck($":SX05,{V(c.PdCor)}#");
-                SendAck($":SX06,{V(c.DfCor)}#");
-                SendAck($":SX07,{V(c.TfCor)}#");
-                SendAck($":SX08,{V(c.Hcp)}#");
-                SendAck($":SX09,{V(c.Hca)}#");
-                SendAck($":SX0a,{V(c.Dcp)}#");
-                SendAck($":SX0b,{V(c.Dca)}#");
+                if ( mountType == MountType.EQFork || mountType == MountType.AltAz )
+                    SendAck($":SX06,{V(c.DfCor)}#");
+                if ( mountType != MountType.EQFork && mountType != MountType.AltAz )
+                    SendAck($":SX07,{V(c.DfCor)}#");
+                SendAck($":SX08,{V(c.TfCor)}#");
+                SendAck($":SX0a,{V(c.Hcp)}#");
+                SendAck($":SX0b,{V(c.Hca)}#");
+                SendAck($":SX0c,{V(c.Dcp)}#");
+                SendAck($":SX0d,{V(c.Dca)}#");
             }, ct);
         }
 

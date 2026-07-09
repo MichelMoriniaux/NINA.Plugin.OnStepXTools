@@ -339,9 +339,9 @@ Key implementation notes:
 | Max altitude | `:Go#` | `:So{v}#` |
 | Meridian E limit | `:GXE9#` | `:SXE9,{v}#` |
 | Meridian W limit | `:GXEA#` | `:SXEA,{v}#` |
-| Preferred pier side | `:GXE8#` | `:SXE8,{v}#` |
-| Auto meridian flip | `:GXE6#` | `:SXE6,{v}#` |
-| Pause at home | `:GXE7#` | `:SXE7,{v}#` |
+| Preferred pier side | `:GX96#` | `:SX96,{v}#` |
+| Auto meridian flip | `:GX95#` | `:SX95,{v}#` |
+| Pause at home | `:GX98#` | `:SX98,{v}#` |
 | Axis parameters (≥10.26) | `:GXA{n},{i}#` | `:SXA{n},{i},{v}#` |
 | Weather temp | `:GX9A#` | — |
 | Weather pressure | `:GX9B#` | — |

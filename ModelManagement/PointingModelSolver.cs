@@ -134,18 +134,18 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             double dcp = Math.Atan2(-dcB, dcA) * 180.0 / Math.PI;
 
             return new AlignmentModelCoefficients {
-                Ax1Cor = x[0],
-                Ax2Cor = x[1],
-                AltCor = x[2],
-                AzmCor = x[3],
-                DoCor  = x[4],
-                PdCor  = x[5],   // now solved, not hardcoded to 0
-                DfCor  = x[6],
-                TfCor  = x[7],
-                Hcp    = hcp,
-                Hca    = hca,
-                Dcp    = dcp,
-                Dca    = dca,
+                Ax1Cor = Convert.ToInt32(x[0]),
+                Ax2Cor = Convert.ToInt32(x[1]),
+                AltCor = Convert.ToInt32(x[2]),
+                AzmCor = Convert.ToInt32(x[3]),
+                DoCor  = Convert.ToInt32(x[4]),
+                PdCor  = Convert.ToInt32(x[5]),   // now solved, not hardcoded to 0
+                DfCor  = Convert.ToInt32(x[6]),
+                TfCor  = Convert.ToInt32(x[7]),
+                Hcp    = Convert.ToInt32(hcp),
+                Hca    = Convert.ToInt32(hca),
+                Dcp    = Convert.ToInt32(dcp),
+                Dca    = Convert.ToInt32(dca),
                 Stars  = n
             };
         }
