@@ -641,6 +641,17 @@ Axis service commands are implemented by `Axis.command.cpp`. For the main telesc
 | `:SXAC,1#` | `0/1` | Use compile-time `Config.h` axis settings | TODO |
 | `:SXAa,R#` | `0/1` | Revert axis `a` settings to defaults on next boot | Implemented |
 | `:SXAa,p,value#` | `0/1` | Set axis parameter `p` for axis `a` | Implemented |
+| `:SX4E,T#` | `0/1` | Servo Calibration Track Normal | was removed in 10.26a |
+| `:SX4E,F#` | `0/1` | Servo Calibration Track fixed rate | was removed in 10.26a |
+| `:SX4E,R#` | `0/1` | Servo Calibration record | was removed in 10.26a |
+| `:SX4E,W#` | `0/1` | Servo Calibration stop recording | was removed in 10.26a |
+| `:SX4E,!#` | `0/1` | Servo Calibration Clear Buffer | was removed in 10.26a |
+| `:SX4E,L#` | `0/1` | Servo Calibration load calibration | was removed in 10.26a |
+| `:SX4E,S#` | `0/1` | Servo Calibration save calibration | was removed in 10.26a |
+| `:SX4E,V#` | `0/1` | Servo Calibration load backup | was removed in 10.26a |
+| `:SX4E,B#` | `0/1` | Servo Calibration save backup | was removed in 10.26a |
+| `:SX4E,H#` | `0/1` | Servo Calibration high-pass filter | was removed in 10.26a |
+| `:SX4E,A#` | `0/1` | Servo Calibration low-pass filter | was removed in 10.26a |
 
 ### `:GXAa,p#` Reply Format
 

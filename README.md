@@ -297,24 +297,24 @@ The 12-parameter model matches OnStepX `Align.hs.cpp` exactly:
 
 **ΔH (HA) row:**
 ```
-errH = −ax1Cor + altCor·sinH·tanD − azmCor·cosH·tanD
-       + doCor·p·secD − pdCor·p·tanD
-       + tfCor·cosLat·sinH·secD + hca·cos(H+hcp)·p
+errH = ax1Cor − altCor·sinH·tanD + azmCor·cosH·tanD
+       − doCor·p·secD + pdCor·p·tanD
+       − tfCor·cosLat·sinH·secD − hca·cos(H+hcp)·p
 ```
 
 **ΔD (Dec) row:**
 ```
-errD = ax2Cor·p + altCor·cosH + azmCor·sinH
-       − dfCor·(cosLat·cosH + sinLat·tanD)
-       + tfCor·(cosLat·cosH·sinD − sinLat·cosD)
-       + dca·cos(D+dcp)·p
+errD = −ax2Cor·p − altCor·cosH − azmCor·sinH
+       + dfCor·(cosLat·cosH + sinLat·tanD)
+       − tfCor·(cosLat·cosH·sinD − sinLat·cosD)
+       − dca·cos(D+dcp)·p
 ```
 
 Where `p` = pier side (+1 pierEast, −1 pierWest) matching OnStep's convention.
 
 Key implementation notes:
 - `dH = −errRA / cos(Dec)` — HA arcseconds, not RA on-sky arcseconds
-- `ax1Cor` design-matrix coefficient is **−1** (errH = −ax1Cor + …)
+- `ax1Cor` design-matrix coefficient is **+1** (errH = ax1Cor − …)
 - `ax2Cor`, `doCor`, and harmonics carry the **pier sign**
 - `dfCor` uses the latitude-aware GEM formula (not the simplified fork formula)
 - `tfCor` includes site latitude in both ΔH and ΔD
@@ -340,15 +340,16 @@ Key implementation notes:
 | Meridian E limit | `:GXE9#` | `:SXE9,{v}#` |
 | Meridian W limit | `:GXEA#` | `:SXEA,{v}#` |
 | Preferred pier side | `:GX96#` | `:SX96,{v}#` |
+| Goto buzzer | `:GU#` flag | `:SX97,{v}#` |
 | Auto meridian flip | `:GX95#` | `:SX95,{v}#` |
-| Pause at home | `:GX98#` | `:SX98,{v}#` |
+| Pause at home | `:GU#` flag | `:SX98,{v}#` |
 | Axis parameters (≥10.26) | `:GXA{n},{i}#` | `:SXA{n},{i},{v}#` |
 | Weather temp | `:GX9A#` | — |
 | Weather pressure | `:GX9B#` | — |
 | Weather humidity | `:GX9C#` | — |
 | Weather dew point | `:GX9E#` | — |
 | Controller temp | `:GX9F#` | — |
-| Last error | `:GXE0#` | — |
+| Last error | `:GU#` | — |
 
 ---
 

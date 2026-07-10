@@ -53,9 +53,9 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 double p = pt.PierSide;
 
                 // ── ΔH row ───────────────────────────────────────────────────────────
-                // From Align.hs.cpp mountToObservedPlace():
-                //   observed_H = mount_H + ax1c + DOh + PDh + TFh + COSh  − ax1Cor
-                //   errH = observed_H − mount_H = −ax1Cor + ax1c + DOh + PDh + TFh + COSh
+                // From Align.hs.cpp correct() / mountToObservedPlace():
+                //   mount_H = observed_H + ax1c + DOh + PDh + TFh + COSh - ax1Cor
+                //   errH = observed_H - mount_H = ax1Cor - ax1c - DOh - PDh - TFh - COSh
                 //   ax1c = −azmCor·cosH·tanD + altCor·sinH·tanD
                 //   DOh  =  doCor · secD · p
                 //   PDh  = −pdCor · tanD · p
@@ -66,24 +66,24 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 //   (errRA already carries a cos(Dec) factor; divide it out to get HA arcsec)
                 double dH = -pt.PointingErrorRAArcsec / Math.Max(cosD, 0.01);
 
-                A[2*i,  0] = -1.0;                    // ax1Cor  (errH = −ax1Cor + …)
+                A[2*i,  0] =  1.0;                    // ax1Cor
                 A[2*i,  1] =  0.0;                    // ax2Cor  (no HA effect)
-                A[2*i,  2] =  sinH * tanD;            // altCor  (+PA·sinH·tanD)
-                A[2*i,  3] = -cosH * tanD;            // azmCor  (−PZ·cosH·tanD)
-                A[2*i,  4] =  p * secD;               // doCor   (+DO·secD·p)
-                A[2*i,  5] = -p * tanD;               // pdCor   (−PD·tanD·p)
+                A[2*i,  2] = -sinH * tanD;            // altCor  (-PA·sinH·tanD)
+                A[2*i,  3] =  cosH * tanD;            // azmCor  (+PZ·cosH·tanD)
+                A[2*i,  4] = -p * secD;               // doCor   (-DO·secD·p)
+                A[2*i,  5] =  p * tanD;               // pdCor   (+PD·tanD·p)
                 A[2*i,  6] =  0.0;                    // dfCor   (no HA effect)
-                A[2*i,  7] =  cosLat * sinH * secD;   // tfCor   (+TF·cosLat·sinH·secD)
-                A[2*i,  8] =  p * cosH;               // hcA     (pier-signed cosine)
-                A[2*i,  9] =  p * sinH;               // hcB     (pier-signed sine)
+                A[2*i,  7] = -cosLat * sinH * secD;   // tfCor   (-TF·cosLat·sinH·secD)
+                A[2*i,  8] = -p * cosH;               // hcA     (negative pier-signed cosine)
+                A[2*i,  9] = -p * sinH;               // hcB     (negative pier-signed sine)
                 A[2*i, 10] =  0.0;                    // dcA
                 A[2*i, 11] =  0.0;                    // dcB
                 b[2*i]     = dH;
 
                 // ── ΔD row ───────────────────────────────────────────────────────────
-                // From Align.hs.cpp mountToObservedPlace():
-                //   observed_D = mount_D + ax2c + DFd + TFd + COSd  + ax2Cor·p
-                //   errD = observed_D − mount_D = ax2Cor·p + ax2c + DFd + TFd + COSd
+                // From Align.hs.cpp correct() / mountToObservedPlace():
+                //   mount_D = observed_D + ax2c + DFd + TFd + COSd + ax2Cor*p
+                //   errD = observed_D - mount_D = -ax2Cor*p - ax2c - DFd - TFd - COSd
                 //   ax2c = +azmCor·sinH + altCor·cosH
                 //   DFd  = −dfCor·(cosLat·cosH + sinLat·tanD)  [GEM mount]
                 //   TFd  =  tfCor·(cosLat·cosH·sinD − sinLat·cosD)
@@ -93,17 +93,17 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 double dD = pt.PointingErrorDecArcsec;
 
                 A[2*i+1,  0] =  0.0;                                       // ax1Cor
-                A[2*i+1,  1] =  p;                                         // ax2Cor  (+ax2Cor·p)
-                A[2*i+1,  2] =  cosH;                                      // altCor  (+PA·cosH)
-                A[2*i+1,  3] =  sinH;                                      // azmCor  (+PZ·sinH)
+                A[2*i+1,  1] = -p;                                         // ax2Cor  (-ax2Cor*p)
+                A[2*i+1,  2] = -cosH;                                      // altCor  (-PA*cosH)
+                A[2*i+1,  3] = -sinH;                                      // azmCor  (-PZ*sinH)
                 A[2*i+1,  4] =  0.0;                                       // doCor   (no Dec effect)
                 A[2*i+1,  5] =  0.0;                                       // pdCor   (no Dec effect)
-                A[2*i+1,  6] = -(cosLat * cosH + sinLat * tanD);          // dfCor   (GEM: −DF·(cosLat·cosH+sinLat·tanD))
-                A[2*i+1,  7] =  cosLat * cosH * sinD - sinLat * cosD;    // tfCor   (TF·(cosLat·cosH·sinD−sinLat·cosD))
+                A[2*i+1,  6] =  cosLat * cosH + sinLat * tanD;            // dfCor   (GEM: +DF*(cosLat*cosH+sinLat*tanD))
+                A[2*i+1,  7] = -(cosLat * cosH * sinD - sinLat * cosD);   // tfCor   (-TF*(cosLat*cosH*sinD-sinLat*cosD))
                 A[2*i+1,  8] =  0.0;                                       // hcA
                 A[2*i+1,  9] =  0.0;                                       // hcB
-                A[2*i+1, 10] =  p * cosD;                                  // dcA     (pier-signed cosine)
-                A[2*i+1, 11] =  p * sinD;                                  // dcB     (pier-signed sine)
+                A[2*i+1, 10] = -p * cosD;                                  // dcA     (negative pier-signed cosine)
+                A[2*i+1, 11] = -p * sinD;                                  // dcB     (negative pier-signed sine)
                 b[2*i+1]     = dD;
             }
 

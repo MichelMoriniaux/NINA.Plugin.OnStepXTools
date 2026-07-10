@@ -164,7 +164,7 @@
                     </UniformGrid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
-                                ToolTip="Last error message reported by OnStepX (:GXE0#)">
+                                ToolTip="Last error code reported by OnStepX (:GU#)">
                         <TextBlock Text="Last error: " Foreground="Gray" FontSize="10" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding LastError}" Foreground="OrangeRed" VerticalAlignment="Center"
                                    FontFamily="Courier New"/>

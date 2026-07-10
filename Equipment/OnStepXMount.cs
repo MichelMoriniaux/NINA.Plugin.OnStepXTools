@@ -15,46 +15,60 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
     [Export(typeof(IOnStepXMount))]
     [PartCreationPolicy(CreationPolicy.Shared)]
     public class OnStepXMount : IOnStepXMount {
-        private readonly LX200Commander _cmd;
+        private readonly ILx200Transport _cmd;
 
         [ImportingConstructor]
         public OnStepXMount(ITelescopeMediator telescope) {
             _cmd = new LX200Commander(telescope);
         }
 
+        public OnStepXMount(ILx200Transport transport) {
+            _cmd = transport;
+        }
+
         // ── Alignment model ──────────────────────────────────────────────────────
 
         public Task<AlignmentModelCoefficients?> GetCoefficientsAsync(CancellationToken ct = default) {
             return Task.Run( async () => {
-                // Coefficient hex indices 0–b; 8=hcp(°), a=dcp(°), others arcseconds
                 var c = new AlignmentModelCoefficients();
                 var mountType = await GetMountTypeAsync(ct);
-                c.Ax1Cor = ParseInt(_cmd.SendString(":GX00#")) ?? 0;
-                c.Ax2Cor = ParseInt(_cmd.SendString(":GX01#")) ?? 0;
-                c.AltCor = ParseInt(_cmd.SendString(":GX02#")) ?? 0;
-                c.AzmCor = ParseInt(_cmd.SendString(":GX03#")) ?? 0;
-                c.DoCor  = ParseInt(_cmd.SendString(":GX04#")) ?? 0;
-                c.PdCor  = ParseInt(_cmd.SendString(":GX05#")) ?? 0;
-                if ( mountType == MountType.EQFork || mountType == MountType.AltAz )
-                    c.DfCor  = ParseInt(_cmd.SendString(":GX06#")) ?? 0;
-                if ( mountType != MountType.EQFork && mountType != MountType.AltAz )
-                    c.DfCor  = ParseInt(_cmd.SendString(":GX07#")) ?? 0;
-                c.TfCor  = ParseInt(_cmd.SendString(":GX08#")) ?? 0;
-                c.Hcp    = ParseInt(_cmd.SendString(":GX0a#")) ?? 0;
-                c.Hca    = ParseInt(_cmd.SendString(":GX0b#")) ?? 0;
-                c.Dcp    = ParseInt(_cmd.SendString(":GX0c#")) ?? 0;
-                c.Dca    = ParseInt(_cmd.SendString(":GX0d#")) ?? 0;
-                // c.Stars  = ParseInt(_cmd.SendString(":GX09#")) ?? 0;
+                c.Ax1Cor = ReadCoefficient(0x00);
+                c.Ax2Cor = ReadCoefficient(0x01);
+                c.AltCor = ReadCoefficient(0x02);
+                c.AzmCor = ReadCoefficient(0x03);
+                c.DoCor  = ReadCoefficient(0x04);
+                c.PdCor  = ReadCoefficient(0x05);
+                c.DfCor  = ReadCoefficient(OnStepXProtocol.IsForkOrAltAz(mountType) ? 0x06 : 0x07);
+                c.TfCor  = ReadCoefficient(0x08);
+                c.Hcp    = ReadCoefficient(0x0a);
+                c.Hca    = ReadCoefficient(0x0b);
+                c.Dcp    = ReadCoefficient(0x0c);
+                c.Dca    = ReadCoefficient(0x0d);
+                // removing this for the time being as for the mount the star count is only relevant to the alignment model
+                // this code is only relevant to the sky model. Additionally calling this resets the star count
+                // c.Stars remain in the Object as it may be useful for model management
+                // c.Stars  = ParseInt(_cmd.SendString(OnStepXProtocol.GetStarCount())) ?? 0;
                 return (AlignmentModelCoefficients?)c;
             }, ct);
         }
 
         public Task<int> GetAlignmentStarCountAsync(CancellationToken ct = default) =>
-            Task.Run(() => ParseInt(_cmd.SendString(":GX09#")) ?? 0, ct);
+            Task.Run(() => ParseInt(_cmd.SendString(OnStepXProtocol.GetStarCount())) ?? 0, ct);
+
+        public Task<AlignmentControllerStatus> GetAlignmentControllerStatusAsync(CancellationToken ct = default) =>
+            Task.Run(() => ParseAlignmentStatus(_cmd.SendString(OnStepXProtocol.AlignmentStatus())), ct);
+
+        public async Task<bool> EnsureModelActivatedAsync(CancellationToken ct = default) {
+            var coefficients = await GetCoefficientsAsync(ct);
+            if (coefficients == null || !HasModelData(coefficients)) return false;
+            await ForceModelActivationAsync(ct);   // wonder if this should be forced, what if the user does not want the model to be forcibly activated?
+            return true;
+        }
 
         // ── Motor config ─────────────────────────────────────────────────────────
         // TODO: verify exact command format against OnStepX firmware src/lib/commands/
-
+        // These methods exist in MountSettingsViewModel.cs they should be pulled in here and called from there
+        // and all of these parameters are called from a single SXAa,i,p call
         public Task<AxisConfig?> GetAxisConfigAsync(int axis, CancellationToken ct = default) =>
             Task.FromResult<AxisConfig?>(null); // placeholder - needs firmware source
 
@@ -65,194 +79,165 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             Task.FromResult<PidConfig?>(null);
 
         public Task SetTrackingPidAsync(int axis, PidConfig pid, CancellationToken ct = default) =>
-            Task.Run(() => {
-                // TODO: verify command format against firmware PID section
-                _cmd.SendBlind($":SXPt{axis},{pid.P.ToString(CultureInfo.InvariantCulture)}:{pid.I.ToString(CultureInfo.InvariantCulture)}:{pid.D.ToString(CultureInfo.InvariantCulture)}#");
-            }, ct);
+            Task.FromException(new NotSupportedException(
+                "Tracking PID writes are disabled until the OnStepX firmware command form is verified."));
 
         public Task<PidConfig?> GetSlewingPidAsync(int axis, CancellationToken ct = default) =>
             Task.FromResult<PidConfig?>(null);
 
         public Task SetSlewingPidAsync(int axis, PidConfig pid, CancellationToken ct = default) =>
-            Task.Run(() => {
-                _cmd.SendBlind($":SXPs{axis},{pid.P.ToString(CultureInfo.InvariantCulture)}:{pid.I.ToString(CultureInfo.InvariantCulture)}:{pid.D.ToString(CultureInfo.InvariantCulture)}#");
-            }, ct);
+            Task.FromException(new NotSupportedException(
+                "Slewing PID writes are disabled until the OnStepX firmware command form is verified."));
+        // end useless commands
 
         public Task SetMountTypeAsync(MountType type, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXEM,{(int)type}#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetMountType(type)), ct);
 
         public Task<MountType> GetMountTypeAsync(CancellationToken ct = default) =>
-            Task.Run(() => (MountType)(ParseInt(_cmd.SendString($":GXEM#")) ?? 0), ct);
+            Task.Run(() => (MountType)(ParseInt(_cmd.SendString(OnStepXProtocol.GetMountType())) ?? 0), ct);
 
         public Task RebootAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":ERESET#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.Reboot()), ct);
 
         public Task ServoCalibrationAsync(ServoCalibrationCommand cmd, CancellationToken ct = default) =>
             Task.Run(() => {
                 // TODO: verify calibration command strings against firmware
                 var lx = cmd switch {
-                    ServoCalibrationCommand.TrackNormally       => ":TOA#",
-                    ServoCalibrationCommand.TrackFixedRate      => ":TOF#",
-                    ServoCalibrationCommand.RecordCalibration   => ":SXC1,1#",
-                    ServoCalibrationCommand.StopRecording       => ":SXC1,0#",
-                    ServoCalibrationCommand.ClearBuffer         => ":SXC2,0#",
-                    ServoCalibrationCommand.LoadCalibration     => ":SXC3,0#",
-                    ServoCalibrationCommand.SaveCalibration     => ":SXC3,1#",
-                    ServoCalibrationCommand.LoadBackup          => ":SXC4,0#",
-                    ServoCalibrationCommand.SaveBackup          => ":SXC4,1#",
-                    ServoCalibrationCommand.HighPassFilter      => ":SXC5,1#",
-                    ServoCalibrationCommand.LowPassFilter       => ":SXC5,0#",
+                    ServoCalibrationCommand.TrackNormally       => OnStepXProtocol.ServoTrackNormal(),
+                    ServoCalibrationCommand.TrackFixedRate      => OnStepXProtocol.ServoTrackFixed(),
+                    ServoCalibrationCommand.RecordCalibration   => OnStepXProtocol.ServoRecord(),
+                    ServoCalibrationCommand.StopRecording       => OnStepXProtocol.ServoStop(),
+                    ServoCalibrationCommand.ClearBuffer         => OnStepXProtocol.ServoClear(),
+                    ServoCalibrationCommand.LoadCalibration     => OnStepXProtocol.ServoLoadCal(),
+                    ServoCalibrationCommand.SaveCalibration     => OnStepXProtocol.ServoSaveCal(),
+                    ServoCalibrationCommand.LoadBackup          => OnStepXProtocol.ServoLoadBackup(),
+                    ServoCalibrationCommand.SaveBackup          => OnStepXProtocol.ServoSaveBackup(),
+                    ServoCalibrationCommand.HighPassFilter      => OnStepXProtocol.ServoHpf(),
+                    ServoCalibrationCommand.LowPassFilter       => OnStepXProtocol.ServoLpf(),
                     _ => null
                 };
                 if (lx != null) _cmd.SendBlind(lx);
             }, ct);
-
         // ── Settings ─────────────────────────────────────────────────────────────
 
-        public Task SetLocationAsync(double lonDeg, double latDeg, double elevM, CancellationToken ct = default) =>
+        public Task SetLocationAsync(double longitudeDeg, double latitudeDeg, double elevationM, CancellationToken ct = default) =>
             Task.Run(() => {
-                _cmd.SendBlind($":St{FormatDMS(latDeg)}#");
-                _cmd.SendBlind($":Sg{FormatDMS(lonDeg)}#");
-                _cmd.SendBlind($":Sc{((int)elevM).ToString(CultureInfo.InvariantCulture)}#");
+                _cmd.SendBlind(OnStepXProtocol.Latitude(latitudeDeg));
+                _cmd.SendBlind(OnStepXProtocol.LongitudeFromEastPositive(longitudeDeg));
+                _cmd.SendBlind(OnStepXProtocol.Elevation(elevationM));
             }, ct);
 
         public Task SetTrackingAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(enabled ? ":Te#" : ":Td#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.Tracking(enabled)), ct);
 
         public Task SetTrackingRateAsync(TrackingRate rate, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(rate switch {
-                TrackingRate.Lunar    => ":TL#",
-                TrackingRate.Solar    => ":TS#",
-                TrackingRate.King     => ":TK#",
-                _                     => ":TQ#"
-            }), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.TrackingRate(rate)), ct);
 
         public Task SetCompensatedTrackingAsync(CompensatedTracking mode, bool dualAxis, CancellationToken ct = default) =>
             Task.Run(() => {
-                // TODO: verify command against firmware - :SXE1,n# or similar
-                var v = mode switch {
-                    CompensatedTracking.Full          => dualAxis ? 2 : 1,
-                    CompensatedTracking.RefractionOnly => dualAxis ? 4 : 3,
-                    _                                  => 0
-                };
-                _cmd.SendBlind($":SXE1,{v}#");
+                _cmd.SendBlind(OnStepXProtocol.CompensatedTracking(mode));
+                if (mode != CompensatedTracking.Off)
+                    _cmd.SendBlind(OnStepXProtocol.CompensatedTrackingAxis(
+                        dualAxis ? CompensatedTrackingAxis.Dual : CompensatedTrackingAxis.Single));
             }, ct);
 
         public Task AdjustTrackingFrequencyAsync(int direction, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(direction >= 0 ? ":T+#" : ":T-#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.TrackingFrequencyAdjust(direction)), ct);
 
         public Task ResetTrackingFrequencyAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":TR#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.TrackingFrequencyReset()), ct);
+
+        public Task SetHomePositionAsync(CancellationToken ct = default) =>
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetHomePosition()), ct);
 
         public Task SetParkPositionAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":SP#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetParkPosition()), ct);
 
         public Task SetGuideRateAsync(int rateIndex, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXF3,{rateIndex}#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.GuideRatePreset(rateIndex)), ct);
 
         public Task SetSlewSpeedAsync(SlewSpeed speed, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(speed switch {
-                SlewSpeed.VFast  => ":RS4#",
-                SlewSpeed.Fast   => ":RS3#",
-                SlewSpeed.Normal => ":RS2#",
-                SlewSpeed.Slow   => ":RS1#",
-                _                => ":RS0#"
-            }), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SlewSpeedPreset(speed)), ct);
 
         public Task SetGotoBuzzerAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SX97,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.GotoBuzzer(enabled)), ct);
 
         public Task SetAutoMeridianFlipAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SX95,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.AutoMeridianFlip(enabled)), ct);
 
         public Task TriggerMeridianFlipAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(":Mf#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.MeridianFlipNow()), ct);
 
         public Task SetPauseAtHomeAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SX98,{(enabled ? 1 : 0)}#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.PauseAtHome(enabled)), ct);
 
         public Task SetPreferredPierSideAsync(PreferredPierSide side, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SX96,{(int)side}#"), ct);
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.PreferredPierSide(side)), ct);
 
         public Task SetBacklashAsync(int axis1, int axis2, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind($":SXF5,{axis1}:{axis2}#"), ct);
+            Task.Run(() => {
+                _cmd.SendBlind(OnStepXProtocol.BacklashRa(axis1));
+                _cmd.SendBlind(OnStepXProtocol.BacklashDec(axis2));
+            }, ct);
 
         public Task SetLimitsAsync(double minAlt, double maxAlt, double east, double west, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(
-                $":SXF6,{F(minAlt)}:{F(maxAlt)}:{F(east)}:{F(west)}#"), ct);
+            Task.Run(() => {
+                _cmd.SendBlind(OnStepXProtocol.HorizonLimit(minAlt));
+                _cmd.SendBlind(OnStepXProtocol.OverheadLimit(maxAlt));
+                _cmd.SendBlind(OnStepXProtocol.MeridianLimitEast(east));
+                _cmd.SendBlind(OnStepXProtocol.MeridianLimitWest(west));
+            }, ct);
 
         // ── Alignment ────────────────────────────────────────────────────────────
 
         public Task ClearAlignmentModelAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(":SX09,0#"), ct);
+            Task.Run(() => SendAck(OnStepXProtocol.AlignmentReset()), ct);
 
         public Task UploadAlignmentStarAsync(
             double actualHAHours, double actualDecDeg,
             double mountHAHours,  double mountDecDeg,
             int pierSide, CancellationToken ct = default) {
             return Task.Run(() => {
-                // Protocol: :SX0A (actual HA), :SX0B (actual Dec),
-                //           :SX0C (mount HA),  :SX0D (mount Dec),
-                //           :SX0E (pier side and commit)
-                SendAck($":SX0A,{FormatHA(actualHAHours)}#");
-                SendAck($":SX0B,{FormatDec(actualDecDeg)}#");
-                SendAck($":SX0C,{FormatHA(mountHAHours)}#");
-                SendAck($":SX0D,{FormatDec(mountDecDeg)}#");
-                SendAck($":SX0E,{pierSide}#");
+                SendAck(OnStepXProtocol.StarActualHa(actualHAHours));
+                SendAck(OnStepXProtocol.StarActualDec(actualDecDeg));
+                SendAck(OnStepXProtocol.StarMountHa(mountHAHours));
+                SendAck(OnStepXProtocol.StarMountDec(mountDecDeg));
+                SendAck(OnStepXProtocol.StarCommit(pierSide));
             }, ct);
         }
 
-        // LX200 HA format: HH:MM:SS  (normalised to 0–23 h)
-        private static string FormatHA(double haHours) {
-            haHours = ((haHours % 24.0) + 24.0) % 24.0;
-            int h = (int)haHours;
-            int m = (int)((haHours - h) * 60.0);
-            int s = (int)Math.Round(((haHours - h) * 60.0 - m) * 60.0);
-            if (s == 60) { m++; s = 0; }
-            if (m == 60) { h = (h + 1) % 24; m = 0; }
-            return $"{h:D2}:{m:D2}:{s:D2}";
-        }
-
-        // LX200 Dec format: sDD*MM:SS  (s = '+' or '-')
-        private static string FormatDec(double decDeg) {
-            char sign = decDeg < 0 ? '-' : '+';
-            decDeg = Math.Abs(decDeg);
-            int d = (int)decDeg;
-            int m = (int)((decDeg - d) * 60.0);
-            int s = (int)Math.Round(((decDeg - d) * 60.0 - m) * 60.0);
-            if (s == 60) { m++; s = 0; }
-            if (m == 60) { d++; m = 0; }
-            return $"{sign}{d:D2}*{m:D2}:{s:D2}";
-        }
-
         public Task ComputeAlignmentOnControllerAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(":SX09,1#"), ct);
+            Task.Run(() => SendAck(OnStepXProtocol.AlignmentCompute()), ct);
 
         public Task SaveAlignmentToEepromAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(":AW#"), ct);
+            Task.Run(() => SendAck(OnStepXProtocol.AlignmentWriteNv()), ct);
 
         public Task ForceModelActivationAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(":SX09,2#"), ct);
+            Task.Run(() => SendAck(OnStepXProtocol.AlignmentActivate()), ct);
 
         public Task WriteCoefficientsAsync(AlignmentModelCoefficients c, CancellationToken ct = default) {
-            return Task.Run( async() => {
-                static string V(int v) => v.ToString();
+            return Task.Run( async () => {
+                var expected = RoundCoefficients(c);
                 var mountType = await GetMountTypeAsync(ct);
-                SendAck($":SX00,{V(c.Ax1Cor)}#");
-                SendAck($":SX01,{V(c.Ax2Cor)}#");
-                SendAck($":SX02,{V(c.AltCor)}#");
-                SendAck($":SX03,{V(c.AzmCor)}#");
-                SendAck($":SX04,{V(c.DoCor)}#");
-                SendAck($":SX05,{V(c.PdCor)}#");
-                if ( mountType == MountType.EQFork || mountType == MountType.AltAz )
-                    SendAck($":SX06,{V(c.DfCor)}#");
-                if ( mountType != MountType.EQFork && mountType != MountType.AltAz )
-                    SendAck($":SX07,{V(c.DfCor)}#");
-                SendAck($":SX08,{V(c.TfCor)}#");
-                SendAck($":SX0a,{V(c.Hcp)}#");
-                SendAck($":SX0b,{V(c.Hca)}#");
-                SendAck($":SX0c,{V(c.Dcp)}#");
-                SendAck($":SX0d,{V(c.Dca)}#");
+                SendAck(OnStepXProtocol.SetCoefficient(0x00, expected.Ax1Cor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x01, expected.Ax2Cor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x02, expected.AltCor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x03, expected.AzmCor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x04, expected.DoCor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x05, expected.PdCor));
+                SendAck(OnStepXProtocol.SetCoefficient(OnStepXProtocol.IsForkOrAltAz(mountType) ? 0x06 : 0x07, expected.DfCor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x08, expected.TfCor));
+                SendAck(OnStepXProtocol.SetCoefficient(0x0a, expected.Hcp));
+                SendAck(OnStepXProtocol.SetCoefficient(0x0b, expected.Hca));
+                SendAck(OnStepXProtocol.SetCoefficient(0x0c, expected.Dcp));
+                SendAck(OnStepXProtocol.SetCoefficient(0x0d, expected.Dca));
+                SendAck(OnStepXProtocol.AlignmentActivate());
+
+                // reread from the mount to verify that the coefficients were properly written
+                var actual = GetCoefficientsAsync(ct).GetAwaiter().GetResult();
+                if (actual == null || !CoefficientsMatch(expected, RoundCoefficients(actual))) {
+                    throw new InvalidOperationException("OnStepX coefficient write verification failed.");
+                }
             }, ct);
         }
 
@@ -299,15 +284,75 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             return int.TryParse(s, out var v) ? v : null;
         }
 
-        private static string FormatDMS(double deg) {
-            var sign = deg < 0 ? "-" : "+";
-            deg = Math.Abs(deg);
-            var d = (int)deg;
-            var m = (int)((deg - d) * 60);
-            var sec = (deg - d - m / 60.0) * 3600;
-            return $"{sign}{d:D2}:{m:D2}:{sec:F0}";
+        private int ReadCoefficient(int hexRegister) =>
+            ParseInt(_cmd.SendString(OnStepXProtocol.GetCoefficient(hexRegister))) ?? 0;
+
+        private static AlignmentControllerStatus ParseAlignmentStatus(string? raw) {
+            raw ??= string.Empty;
+            var max = raw.Length > 0 && char.IsDigit(raw[0]) ? raw[0] - '0' : 0;
+            var current = raw.Length > 1 && char.IsDigit(raw[1]) ? raw[1] - '0' : 0;
+            var last = raw.Length > 2 && char.IsDigit(raw[2]) ? raw[2] - '0' : 0;
+            return new AlignmentControllerStatus {
+                MaxStars = max,
+                CurrentStar = current,
+                LastStar = last
+            };
         }
 
-        private static string F(double v) => v.ToString("F4", CultureInfo.InvariantCulture);
+        private static RoundedCoefficients RoundCoefficients(AlignmentModelCoefficients c) => new() {
+            Ax1Cor = OnStepXProtocol.RoundToInt(c.Ax1Cor),
+            Ax2Cor = OnStepXProtocol.RoundToInt(c.Ax2Cor),
+            AltCor = OnStepXProtocol.RoundToInt(c.AltCor),
+            AzmCor = OnStepXProtocol.RoundToInt(c.AzmCor),
+            DoCor = OnStepXProtocol.RoundToInt(c.DoCor),
+            PdCor = OnStepXProtocol.RoundToInt(c.PdCor),
+            DfCor = OnStepXProtocol.RoundToInt(c.DfCor),
+            TfCor = OnStepXProtocol.RoundToInt(c.TfCor),
+            Hcp = OnStepXProtocol.RoundToInt(c.Hcp),
+            Hca = OnStepXProtocol.RoundToInt(c.Hca),
+            Dcp = OnStepXProtocol.RoundToInt(c.Dcp),
+            Dca = OnStepXProtocol.RoundToInt(c.Dca)
+        };
+
+        private static bool CoefficientsMatch(RoundedCoefficients expected, RoundedCoefficients actual) =>
+            expected.Ax1Cor == actual.Ax1Cor &&
+            expected.Ax2Cor == actual.Ax2Cor &&
+            expected.AltCor == actual.AltCor &&
+            expected.AzmCor == actual.AzmCor &&
+            expected.DoCor == actual.DoCor &&
+            expected.PdCor == actual.PdCor &&
+            expected.DfCor == actual.DfCor &&
+            expected.TfCor == actual.TfCor &&
+            expected.Hcp == actual.Hcp &&
+            expected.Hca == actual.Hca &&
+            expected.Dcp == actual.Dcp &&
+            expected.Dca == actual.Dca;
+
+        private static bool HasModelData(AlignmentModelCoefficients c) {
+            var rounded = RoundCoefficients(c);
+            return c.Stars > 0 ||
+                   rounded.Ax1Cor != 0 || rounded.Ax2Cor != 0 ||
+                   rounded.AltCor != 0 || rounded.AzmCor != 0 ||
+                   rounded.DoCor != 0 || rounded.PdCor != 0 ||
+                   rounded.DfCor != 0 || rounded.TfCor != 0 ||
+                   rounded.Hcp != 0 || rounded.Hca != 0 ||
+                   rounded.Dcp != 0 || rounded.Dca != 0;
+        }
+
+        // TODO: why? we have AlignmentModelCoefficients that is very similar
+        private sealed class RoundedCoefficients {
+            public int Ax1Cor { get; init; }
+            public int Ax2Cor { get; init; }
+            public int AltCor { get; init; }
+            public int AzmCor { get; init; }
+            public int DoCor { get; init; }
+            public int PdCor { get; init; }
+            public int DfCor { get; init; }
+            public int TfCor { get; init; }
+            public int Hcp { get; init; }
+            public int Hca { get; init; }
+            public int Dcp { get; init; }
+            public int Dca { get; init; }
+        }
     }
 }

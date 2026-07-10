@@ -24,6 +24,10 @@ namespace NINA.Plugin.OnStepXTools.Model {
         public double SolvedRAHours { get; set; }
         public double SolvedDecDeg { get; set; }
 
+        // Filled after plate solve for controller star-upload alignment
+        public double ActualHAHours { get; set; }
+        public double ActualDecDeg { get; set; }
+
         // Computed errors (arcsec)
         public double PointingErrorRAArcsec { get; set; }
         public double PointingErrorDecArcsec { get; set; }

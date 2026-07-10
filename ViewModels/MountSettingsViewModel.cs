@@ -16,6 +16,7 @@ using NINA.Equipment.Interfaces.Mediator;
 using NINA.Equipment.Interfaces.ViewModel;
 using NINA.Profile.Interfaces;
 using NINA.WPF.Base.ViewModel;
+using NINA.Plugin.OnStepXTools.Equipment;
 using NINA.Plugin.OnStepXTools.Interfaces;
 using NINA.Plugin.OnStepXTools.Model;
 
@@ -47,6 +48,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         // ── Axis config - firmware version and format detection ────────────────────
         private int  _fwMajor;
         private int  _fwMinor;
+        private bool _fwVersionKnown;
         private char _axis1DriverType;
         private char _axis2DriverType;
         private bool _axis1OldFormat;
@@ -69,8 +71,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public void UpdateDeviceInfo(TelescopeInfo info) {
             IsConnected = info.Connected;
             if (info.Connected && !_wasConnected) {
-                // Detect firmware version so axis config uses the right command format
-                try { ParseFirmwareVersion(info.Description ?? string.Empty); } catch { }
+                // Detect firmware version so axis config uses the right command format.
+                // ASCOM's TelescopeInfo.Description is the driver's static description, not the
+                // mount's live firmware string - query the controller directly via :GVN#.
+                try { ParseFirmwareVersion(GetStr(OnStepXProtocol.GetFirmwareVersion()) ?? string.Empty); } catch { }
+                _ = _mount.EnsureModelActivatedAsync();
                 _ = LoadAllSettingsAsync();
             }
             _wasConnected = info.Connected;
@@ -156,13 +161,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private int _limitMinAlt;
         private int _limitMaxAlt = 85;
-        private int _limitEastDeg;
-        private int _limitWestDeg = 15;
+        private double _limitEastDeg;
+        private double _limitWestDeg = 15;
 
         public int LimitMinAltDeg        { get => _limitMinAlt;   set => SetProperty(ref _limitMinAlt,   value); }
         public int LimitMaxAltDeg        { get => _limitMaxAlt;   set => SetProperty(ref _limitMaxAlt,   value); }
-        public int LimitEastPastMeridian { get => _limitEastDeg;  set => SetProperty(ref _limitEastDeg,  value*60); }
-        public int LimitWestPastMeridian { get => _limitWestDeg;  set => SetProperty(ref _limitWestDeg,  value*60); }
+        public double LimitEastPastMeridian { get => _limitEastDeg;  set => SetProperty(ref _limitEastDeg,  value); }
+        public double LimitWestPastMeridian { get => _limitWestDeg;  set => SetProperty(ref _limitWestDeg,  value); }
 
         // ── Status ───────────────────────────────────────────────────────────────
 
@@ -224,107 +229,81 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private void BuildCommands() {
             bool Connected() => _isConnected;
-            void Send(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
             void SendBlind(string cmd) { try { _telescope.SendCommandBlind(cmd, raw: true); } catch { } }
 
             LoadCommand = new RelayCommand(
                 async _ => await LoadAllSettingsAsync(), _ => Connected());
 
-            TrackOnCommand  = new RelayCommand(_ => SendBlind(":Te#"), _ => Connected());
-            TrackOffCommand = new RelayCommand(_ => SendBlind(":Td#"), _ => Connected());
+            TrackOnCommand  = new RelayCommand(_ => SendBlind(OnStepXProtocol.Tracking(true)), _ => Connected());
+            TrackOffCommand = new RelayCommand(_ => SendBlind(OnStepXProtocol.Tracking(false)), _ => Connected());
 
             SetTrackRateCommand = new RelayCommand(_ => {
-                SendBlind(TrackingRate switch {
-                    TrackingRate.Lunar   => ":TL#",
-                    TrackingRate.Solar   => ":TS#",
-                    TrackingRate.King    => ":TK#",
-                    _                    => ":TQ#"
-                });
+                SendBlind(OnStepXProtocol.TrackingRate(TrackingRate));
                 // Status(":GU#");
             }, _ => Connected());
 
             SetCompTrackCommand = new RelayCommand(_ => {
-                // :Tn# = off, :T1# = 1-axis refraction, :T2# = 2-axis refraction, :To# = full model
-                SendBlind(CompensatedTracking switch {
-                    CompensatedTracking.RefractionOnly => ":Tr#",
-                    CompensatedTracking.Full           => ":To#",
-                    _                                  => ":Tn#"
-                });
+                SendBlind(OnStepXProtocol.CompensatedTracking(CompensatedTracking));
             }, _ => Connected());
 
             SetCompTrackAxisCommand = new RelayCommand(_ => {
-                // :Tn# = off, :T1# = 1-axis refraction, :T2# = 2-axis refraction, :To# = full model
-                SendBlind(CompensatedTrackingAxis switch {
-                    CompensatedTrackingAxis.Single => ":T1#",
-                    _                              => ":T2#"
-                });
+                SendBlind(OnStepXProtocol.CompensatedTrackingAxis(CompensatedTrackingAxis));
             }, _ => Connected());
 
-            FreqPlusCommand  = new RelayCommand(_ => SendBlind(":T+#"), _ => Connected());
-            FreqMinusCommand = new RelayCommand(_ => SendBlind(":T-#"), _ => Connected());
-            FreqResetCommand = new RelayCommand(_ => SendBlind(":TR#"), _ => Connected());
+            FreqPlusCommand  = new RelayCommand(_ => SendBlind(OnStepXProtocol.TrackingFrequencyAdjust(+1)), _ => Connected());
+            FreqMinusCommand = new RelayCommand(_ => SendBlind(OnStepXProtocol.TrackingFrequencyAdjust(-1)), _ => Connected());
+            FreqResetCommand = new RelayCommand(_ => SendBlind(OnStepXProtocol.TrackingFrequencyReset()), _ => Connected());
 
             SetGuideRateCommand = new RelayCommand(_ => {
                 var idx = Math.Clamp(GuideRateIndex, 0, 9);
-                SendBlind($":R{idx}#");
+                SendBlind(OnStepXProtocol.GuideRatePreset(idx));
                 StatusMessage = $"Guide rate set to {GuideRateNames[idx]}";
             }, _ => Connected());
 
             SetSlewSpeedCommand = new RelayCommand(_ => {
-                SendBlind(SlewSpeed switch {
-                    SlewSpeed.VFast  => ":SX93,1#",
-                    SlewSpeed.Fast   => ":SX93,2#",
-                    SlewSpeed.Normal => ":SX93,3#",
-                    SlewSpeed.Slow   => ":SX93,4#",
-                    _                => ":SX93,5#"
-                });
+                SendBlind(OnStepXProtocol.SlewSpeedPreset(SlewSpeed));
                 StatusMessage = "Slew speed updated.";
             }, _ => Connected());
 
             SetMeridianSettingsCommand = new RelayCommand(_ => {
-                SendBlind($":SXE97,{(BuzzerEnabled       ? 1 : 0)}#");
-                SendBlind($":SX95,{(AutoMeridianFlip    ? 1 : 0)}#");
-                SendBlind($":SX98,{(PauseAtHome         ? 1 : 0)}#");
-                SendBlind($":SX96,{PierSideToChar(PreferredPierSide)}#");
+                SendBlind(OnStepXProtocol.GotoBuzzer(BuzzerEnabled));
+                SendBlind(OnStepXProtocol.AutoMeridianFlip(AutoMeridianFlip));
+                SendBlind(OnStepXProtocol.PauseAtHome(PauseAtHome));
+                SendBlind(OnStepXProtocol.PreferredPierSide(PreferredPierSide));
                 StatusMessage = "Meridian settings updated.";
             }, _ => Connected());
 
             TriggerMeridianFlipCommand = new RelayCommand(_ => {
-                SendBlind(":Mf#");
+                SendBlind(OnStepXProtocol.MeridianFlipNow());
                 StatusMessage = "Meridian flip triggered.";
             }, _ => Connected());
 
             SetParkCommand = new RelayCommand(_ => {
-                SendBlind(":hQ#");
+                SendBlind(OnStepXProtocol.SetParkPosition());
                 StatusMessage = "Park position set to current.";
             }, _ => Connected());
 
             SetHomeCommand = new RelayCommand(_ => {
-                SendBlind(":FH#");
+                SendBlind(OnStepXProtocol.SetHomePosition());
                 StatusMessage = "Home position set to current.";
             }, _ => Connected());
 
             SetEncoderOriginCommand = new RelayCommand(_ => {
-                SendBlind(":SEO#");
+                SendBlind(OnStepXProtocol.SetEncoderOrigin());
                 StatusMessage = "Encoder origin position set to current.";
             }, _ => Connected());
 
             SetBacklashCommand = new RelayCommand(_ => {
-                SendBlind($":$BR{BacklashAxis1Arcsec}#");
-                SendBlind($":$BD{BacklashAxis2Arcsec}#");
+                SendBlind(OnStepXProtocol.BacklashRa(BacklashAxis1Arcsec));
+                SendBlind(OnStepXProtocol.BacklashDec(BacklashAxis2Arcsec));
                 StatusMessage = "Backlash updated.";
             }, _ => Connected());
 
             SetLimitsCommand = new RelayCommand(_ => {
-                if (LimitMinAltDeg >= 0)
-                    SendBlind($":Sh+{LimitMinAltDeg}#");
-                else
-                    SendBlind($":Sh{LimitMinAltDeg}#");
-                SendBlind($":So{LimitMaxAltDeg}#");  // TODO chech that this is <= 90
-                var MerMinutes = LimitEastPastMeridian * 60 / 15;
-                SendBlind($":SXE9,{MerMinutes}#");
-                MerMinutes = LimitWestPastMeridian * 60 / 15;
-                SendBlind($":SXEA,{MerMinutes}#");
+                SendBlind(OnStepXProtocol.HorizonLimit(LimitMinAltDeg));
+                SendBlind(OnStepXProtocol.OverheadLimit(LimitMaxAltDeg));
+                SendBlind(OnStepXProtocol.MeridianLimitEast(LimitEastPastMeridian));
+                SendBlind(OnStepXProtocol.MeridianLimitWest(LimitWestPastMeridian));
                 StatusMessage = "Limits updated.";
             }, _ => Connected());
 
@@ -332,16 +311,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 try {
                     var lat  = _profile.ActiveProfile.AstrometrySettings.Latitude;
                     var lon  = _profile.ActiveProfile.AstrometrySettings.Longitude;
-                    var elev = _telescope.GetInfo().SiteElevation;
-                    var latCmd = FormatDMSCommand(lat, degrees: 2);
-                    var lonCmd = FormatDMSCommand(lon, degrees: 3);
-                    SendBlind($":St{latCmd}#");
-                    SendBlind($":Sg{lonCmd}#"); // TODO check if these are signed
-                    if ( elev >= 0 )
-                        SendBlind($":Sv+{((int)elev)}#");
-                    else
-                        SendBlind($":Sv{((int)elev)}#");
-                    StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F0} m";
+                    var elev = _telescope.GetInfo().SiteElevation; // mount's current elevation
+                    await _mount.SetLocationAsync(lon, lat, elev);
+                    StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F1} m";
                     await Task.Delay(200);
                     await LoadAllSettingsAsync();
                 } catch (Exception ex) {
@@ -352,27 +324,27 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             // void Status(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
 
             // ── Axis Config commands ─────────────────────────────────────────────
-            SetMountTypeCommand = new RelayCommand(_ => { SendBlind($":SXEM,{(int)MountType}#"); StatusMessage = "Mount type set - reboot required."; }, _ => Connected());
-            RebootCommand       = new RelayCommand(_ => { SendBlind(":ERESET#"); StatusMessage = "Reboot command sent."; }, _ => Connected());
-            ClearEeprom         = new RelayCommand(_ => { SendBlind(":ENVRESET#"); StatusMessage = "Clear EEPROM command sent."; }, _ => Connected());
-            ContinueGotoAfterPauseCommand = new RelayCommand(_ => { SendBlind(":SX99,1#"); StatusMessage = "Continue Goto after Pause command sent."; }, _ => Connected());
+            SetMountTypeCommand = new RelayCommand(_ => { SendBlind(OnStepXProtocol.SetMountType(MountType)); StatusMessage = "Mount type set - reboot required."; }, _ => Connected());
+            RebootCommand       = new RelayCommand(_ => { SendBlind(OnStepXProtocol.Reboot()); StatusMessage = "Reboot command sent."; }, _ => Connected());
+            ClearEeprom         = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ClearEeprom()); StatusMessage = "Clear EEPROM command sent."; }, _ => Connected());
+            ContinueGotoAfterPauseCommand = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ContinueGotoAfterPause()); StatusMessage = "Continue Goto after Pause command sent."; }, _ => Connected());
 
             SaveAxis1Command   = new RelayCommand(async _ => await SaveAxisAsync(1, Axis1Params), _ => Connected());
             SaveAxis2Command   = new RelayCommand(async _ => await SaveAxisAsync(2, Axis2Params), _ => Connected());
-            RevertAxis1Command = new RelayCommand(_ => { SendBlind(":SXA1,R#"); StatusMessage = "Axis 1 reverted to defaults - reload to verify."; }, _ => Connected());
-            RevertAxis2Command = new RelayCommand(_ => { SendBlind(":SXA2,R#"); StatusMessage = "Axis 2 reverted to defaults - reload to verify."; }, _ => Connected());
+            RevertAxis1Command = new RelayCommand(_ => { SendBlind(OnStepXProtocol.RevertAxis(1)); StatusMessage = "Axis 1 reverted to defaults - reload to verify."; }, _ => Connected());
+            RevertAxis2Command = new RelayCommand(_ => { SendBlind(OnStepXProtocol.RevertAxis(2)); StatusMessage = "Axis 2 reverted to defaults - reload to verify."; }, _ => Connected());
 
-            ServoTrackNormalCommand = new RelayCommand(_ => { SendBlind(":TOA#");    StatusMessage = "Track normally."; },      _ => Connected());
-            ServoTrackFixedCommand  = new RelayCommand(_ => { SendBlind(":TOF#");    StatusMessage = "Track fixed rate."; },    _ => Connected());
-            ServoRecordCommand      = new RelayCommand(_ => { SendBlind(":SXC1,1#"); StatusMessage = "Recording…"; },          _ => Connected());
-            ServoStopCommand        = new RelayCommand(_ => { SendBlind(":SXC1,0#"); StatusMessage = "Stopped."; },            _ => Connected());
-            ServoClearCommand       = new RelayCommand(_ => { SendBlind(":SXC2,0#"); StatusMessage = "Buffer cleared."; },     _ => Connected());
-            ServoLoadCalCommand     = new RelayCommand(_ => { SendBlind(":SXC3,0#"); StatusMessage = "Calibration loaded."; }, _ => Connected());
-            ServoSaveCalCommand     = new RelayCommand(_ => { SendBlind(":SXC3,1#"); StatusMessage = "Calibration saved."; },  _ => Connected());
-            ServoLoadBackupCommand  = new RelayCommand(_ => { SendBlind(":SXC4,0#"); StatusMessage = "Backup loaded."; },      _ => Connected());
-            ServoSaveBackupCommand  = new RelayCommand(_ => { SendBlind(":SXC4,1#"); StatusMessage = "Backup saved."; },       _ => Connected());
-            ServoHpfCommand         = new RelayCommand(_ => { SendBlind(":SXC5,1#"); StatusMessage = "High-pass filter."; },   _ => Connected());
-            ServoLpfCommand         = new RelayCommand(_ => { SendBlind(":SXC5,0#"); StatusMessage = "Low-pass filter."; },    _ => Connected());
+            ServoTrackNormalCommand = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoTrackNormal());    StatusMessage = "Track normally."; },      _ => Connected() && IsOldFormat);
+            ServoTrackFixedCommand  = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoTrackFixed());    StatusMessage = "Track fixed rate."; },    _ => Connected() && IsOldFormat);
+            ServoRecordCommand      = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoRecord()); StatusMessage = "Recording…"; },          _ => Connected() && IsOldFormat);
+            ServoStopCommand        = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoStop()); StatusMessage = "Stopped."; },            _ => Connected() && IsOldFormat);
+            ServoClearCommand       = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoClear()); StatusMessage = "Buffer cleared."; },     _ => Connected() && IsOldFormat);
+            ServoLoadCalCommand     = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoLoadCal()); StatusMessage = "Calibration loaded."; }, _ => Connected() && IsOldFormat);
+            ServoSaveCalCommand     = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoSaveCal()); StatusMessage = "Calibration saved."; },  _ => Connected() && IsOldFormat);
+            ServoLoadBackupCommand  = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoLoadBackup()); StatusMessage = "Backup loaded."; },      _ => Connected() && IsOldFormat);
+            ServoSaveBackupCommand  = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoSaveBackup()); StatusMessage = "Backup saved."; },       _ => Connected() && IsOldFormat);
+            ServoHpfCommand         = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoHpf()); StatusMessage = "High-pass filter."; },   _ => Connected() && IsOldFormat);
+            ServoLpfCommand         = new RelayCommand(_ => { SendBlind(OnStepXProtocol.ServoLpf()); StatusMessage = "Low-pass filter."; },    _ => Connected() && IsOldFormat);
 
             // Sky Model Management
             LoadModelFromMountCommand   = new RelayCommand(async _ => await LoadModelFromMountAsync(), _ => Connected());
@@ -392,7 +364,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             try {
                 await Task.Run(() => {
                     // ─ GU# packed status ─────────────────────────────────────────
-                    var gu = GetStr(":GU#");
+                    var gu = GetStr(OnStepXProtocol.GetStatus());
                     if (!string.IsNullOrEmpty(gu)) {
                         var n = gu.Length;
                         // End-of-string indices: [...][guideRatePulse][guideRate][errorCode]
@@ -422,36 +394,40 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                         });
                     }
 
+                    if (int.TryParse(GetStr(OnStepXProtocol.GetMountType()), out var mt) &&
+                        Enum.IsDefined(typeof(MountType), mt))
+                        Dispatch(() => MountType = ToWritableMountType((MountType)mt));
+
                     // ─ Preferred pier side (:GX96#) ─────────────────────────────
-                    var ps = GetStr(":GX96#");
+                    var ps = GetStr(OnStepXProtocol.GetPreferredPierSide());
                     if (!string.IsNullOrWhiteSpace(ps))
                         Dispatch(() => PreferredPierSide = PierSideFromChar(ps));
 
                     // ─ Backlash ──────────────────────────────────────────────────
-                    if (int.TryParse(GetStr(":%BR#"), out var bl1))
+                    if (int.TryParse(GetStr(OnStepXProtocol.GetBacklashRa()), out var bl1))
                         Dispatch(() => BacklashAxis1Arcsec = bl1);
-                    if (int.TryParse(GetStr(":%BD#"), out var bl2))
+                    if (int.TryParse(GetStr(OnStepXProtocol.GetBacklashDec()), out var bl2))
                         Dispatch(() => BacklashAxis2Arcsec = bl2);
 
                     // ─ Altitude limits ───────────────────────────────────────────
-                    var altString = GetStr(":Gh#");
+                    var altString = GetStr(OnStepXProtocol.GetHorizonLimit());
                     if (!string.IsNullOrWhiteSpace(altString))
                         if (int.TryParse(altString.Replace("*", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var minAlt))
                             Dispatch(() => LimitMinAltDeg = minAlt);
-                    altString = GetStr(":Go#");
+                    altString = GetStr(OnStepXProtocol.GetOverheadLimit());
                     if (!string.IsNullOrWhiteSpace(altString))
                         if (int.TryParse(altString.Replace("*", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var maxAlt))
                             Dispatch(() => LimitMaxAltDeg = maxAlt);
 
                     // ─ Meridian limits ───────────────────────────────────────────
-                    if (int.TryParse(GetStr(":GXE9#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var me))
-                        Dispatch(() => LimitEastPastMeridian = me * 15 / 60);
-                    if (int.TryParse(GetStr(":GXEA#"), NumberStyles.Any, CultureInfo.InvariantCulture, out var mw))
-                        Dispatch(() => LimitWestPastMeridian = mw * 15 / 60);
+                    if (double.TryParse(GetStr(OnStepXProtocol.GetMeridianLimitEast()), NumberStyles.Any, CultureInfo.InvariantCulture, out var me))
+                        Dispatch(() => LimitEastPastMeridian = me / 4.0);
+                    if (double.TryParse(GetStr(OnStepXProtocol.GetMeridianLimitWest()), NumberStyles.Any, CultureInfo.InvariantCulture, out var mw))
+                        Dispatch(() => LimitWestPastMeridian = mw / 4.0);
 
                     // ─ Site location (display only - edit via Sync button) ────────
-                    var latStr = GetStr(":GtH#");
-                    var lonStr = GetStr(":GgH#");
+                    var latStr = GetStr(OnStepXProtocol.GetLatitude());
+                    var lonStr = GetStr(OnStepXProtocol.GetLongitude());
                     if (!string.IsNullOrWhiteSpace(latStr))
                         Dispatch(() => LatitudeDMS  = latStr);
                     if (!string.IsNullOrWhiteSpace(lonStr))
@@ -475,15 +451,17 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             bool useOld = IsOldFormat;
             StatusMessage = useOld
                 ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (pre-10.26 format)…"
-                : $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (per-parameter format)…";
+                : _fwVersionKnown
+                    ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (per-parameter format)…"
+                    : "Firmware version unknown - reading axis config (per-parameter format)…";
             try {
                 await Task.Run(async () => {
                     if (useOld) {
                         await LoadAxisParamsOldFormatAsync(1, Axis1Params);
                         await LoadAxisParamsOldFormatAsync(2, Axis2Params);
                     } else {
-                        var d1 = GetStr(":GXA1,M#") ?? "-";
-                        var d2 = GetStr(":GXA2,M#") ?? "-";
+                        var d1 = GetStr(OnStepXProtocol.GetAxisName(1)) ?? "-";
+                        var d2 = GetStr(OnStepXProtocol.GetAxisName(2)) ?? "-";
                         Dispatch(() => { Axis1DriverId = d1; Axis2DriverId = d2; });
                         await LoadAxisParamsNewFormatAsync(1, Axis1Params);
                         await LoadAxisParamsNewFormatAsync(2, Axis2Params);
@@ -502,7 +480,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private Task LoadAxisParamsOldFormatAsync(int axis, ObservableCollection<AxisParameter> collection) {
             return Task.Run(() => {
-                var raw = GetStr($":GXA{axis}#");
+                var raw = GetStr(OnStepXProtocol.GetAxisParamsOldFormat(axis));
                 Logger.Debug($"OnStepX :GXA{axis}# raw: '{raw}'");
                 if (string.IsNullOrWhiteSpace(raw)) return;
 
@@ -558,7 +536,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private Task LoadAxisParamsNewFormatAsync(int axis, ObservableCollection<AxisParameter> collection) {
             return Task.Run(() => {
-                var rawCount = _telescope.SendCommandString($":GXA{axis},0#", raw: true);
+                var rawCount = _telescope.SendCommandString(OnStepXProtocol.GetAxisParamsCount(axis), raw: true);
                 Logger.Debug($"OnStepX :GXA{axis},0# raw: '{rawCount}'");
                 if (string.IsNullOrWhiteSpace(rawCount)) return;
                 var countStr = rawCount.TrimEnd('#').Trim();
@@ -566,7 +544,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
                 var loaded = new List<AxisParameter>();
                 for (int i = 1; i <= count; i++) {
-                    var r = GetStr($":GXA{axis},{i}#");
+                    var r = GetStr(OnStepXProtocol.GetAxisParameter(axis, i));
                     var p = ParseNewFormatParam(i, r);
                     if (p != null) loaded.Add(p);
                 }
@@ -584,12 +562,12 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     var values = new List<string>();
                     foreach (var p in collection) values.Add(p.EditValue);
                     if (values.Count > 0 && dtype != '\0') values[^1] += dtype;
-                    var cmd = $":SXA{axis},{string.Join(",", values)}#";
+                    var cmd = OnStepXProtocol.SetAxisParamsOldFormat(axis, string.Join(",", values));
                     try { var ok = _telescope.SendCommandBool(cmd, raw: true); if (ok) saved = values.Count; else failed = 1; } catch { failed = 1; }
                 } else {
                     foreach (var param in collection) {
                         if (param.EditValue == param.CurrentValue) continue;
-                        var cmd = $":SXA{axis},{param.Index},{param.EditValue}#";
+                        var cmd = OnStepXProtocol.SetAxisParameter(axis, param.Index, param.EditValue);
                         try { var ok = _telescope.SendCommandBool(cmd, raw: true); if (ok) saved++; else failed++; } catch { failed++; }
                     }
                 }
@@ -601,14 +579,17 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }
         }
 
-        private bool IsOldFormat => _fwMajor < 10 || (_fwMajor == 10 && _fwMinor < 26);
+        public bool IsOldFormat => _fwVersionKnown && (_fwMajor < 10 || (_fwMajor == 10 && _fwMinor < 26));
 
         private void ParseFirmwareVersion(string description) {
+            Logger.Info($"OnStepX firmware description: {description}");
             _fwMajor = 0; _fwMinor = 0;
+            _fwVersionKnown = false;
             var m = Regex.Match(description, @"(\d+)\.(\d+)", RegexOptions.IgnoreCase);
             if (!m.Success) return;
             int.TryParse(m.Groups[1].Value, out _fwMajor);
             int.TryParse(m.Groups[2].Value, out _fwMinor);
+            _fwVersionKnown = true;
             Logger.Info($"OnStepX firmware v{_fwMajor}.{_fwMinor} - axis format: {(IsOldFormat ? "OLD" : "NEW")}");
         }
 
@@ -630,11 +611,22 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             try {
                 var r = _telescope.SendCommandString(cmd, raw: true);
                 return string.IsNullOrWhiteSpace(r) ? null : r.TrimEnd('#').Trim();
-            } catch { return null; }
+            } catch {
+                Logger.Debug($"OnStepX :GXAn# Exception reading return");
+                return null;
+            }
         }
 
         private static void Dispatch(Action a) =>
             System.Windows.Application.Current?.Dispatcher.Invoke(a);
+
+        private static MountType ToWritableMountType(MountType type) => type switch {
+            MountType.GEM_TA or MountType.GEM_TAC => MountType.GEM,
+            MountType.Fork_TA or MountType.Fork_TAC => MountType.Fork,
+            MountType.AltAz_Unlimited => MountType.AltAz,
+            MountType.AltAlt => MountType.Default,
+            _ => type
+        };
 
         // Mount encodes preferred pier side as a single character: B=Best, W=West, E=East, A=Auto
         private static char PierSideToChar(PreferredPierSide s) => s switch {

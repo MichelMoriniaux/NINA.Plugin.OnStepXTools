@@ -103,8 +103,8 @@
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.RefractionOnly}">Refraction only</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full model</ComboBoxItem>
                                 </ComboBox>
-                                <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
-                                        ToolTip="Apply compensation mode (:Tn# / :T1# / :T2#)"/>
+                                <Button Content="Set" Command="{Binding SetCompTrackAxisCommand}" Width="50"
+                                        ToolTip="Apply compensation axis (:T1# / :T2#)"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
@@ -161,7 +161,7 @@
                                     <ComboBoxItem Tag="{x:Static model:SlewSpeed.VSlow}">V.Slow</ComboBoxItem>
                                 </ComboBox>
                                 <Button Content="Set" Command="{Binding SetSlewSpeedCommand}" Width="50"
-                                        ToolTip="Apply the selected slew speed (:RS0# through :RS4#)"/>
+                                        ToolTip="Apply the selected slew speed (:SX93,n#)"/>
                             </StackPanel>
 
                         </StackPanel>
@@ -199,7 +199,7 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="Preferred pier side:" Width="160" VerticalAlignment="Center"
-                                           ToolTip="Which pier side to prefer after a meridian flip (:SXE8,n#)"/>
+                                           ToolTip="Which pier side to prefer after a meridian flip (:SX96,n#)"/>
                                 <ComboBox Width="80" SelectedValue="{Binding PreferredPierSide}" SelectedValuePath="Tag"
                                           ToolTip="Best = firmware decides. East/West = always flip to that side.">
                                     <ComboBoxItem Tag="{x:Static model:PreferredPierSide.Best}">Best</ComboBoxItem>
@@ -217,7 +217,7 @@
                                 <Button Content="Trigger Flip Now"
                                         Command="{Binding TriggerMeridianFlipCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
-                                        ToolTip="Force a meridian flip immediately — mount slews to the opposite pier side (:Mf#)"/>
+                                        ToolTip="Force a meridian flip immediately; mount slews to the opposite pier side (:MN#)"/>
                                 <Button Content="Set Park Position"
                                         Command="{Binding SetParkCommand}"
                                         Padding="6,3" Margin="0,0,6,0"
@@ -467,9 +467,10 @@
                         <StackPanel Margin="6,4">
                             <StackPanel Orientation="Horizontal" Margin="0,2">
                                 <TextBlock Text="Mount type:" Width="90" VerticalAlignment="Center"
-                                           ToolTip="GEM=0, EQ Fork=1, Alt/Az=2. Reboot required after change."/>
+                                           ToolTip="Default=0, GEM=1, Fork=2, Alt/Az=3. Reboot required after change."/>
                                 <ComboBox Width="100" SelectedValue="{Binding MountType}" SelectedValuePath="Tag" Margin="0,0,6,0"
                                           ToolTip="Select the mount geometry. Reboot required after changing.">
+                                    <ComboBoxItem Tag="{x:Static model:MountType.Default}">Default</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:MountType.GEM}">GEM</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:MountType.EQFork}">EQ Fork</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:MountType.AltAz}">Alt/Az</ComboBoxItem>
@@ -590,32 +591,32 @@
                     </GroupBox>
 
                     <!-- Servo Calibration -->
-                    <GroupBox Header="Servo Calibration  ⚠ Verify against firmware before use"
+                    <GroupBox Header="Servo Calibration" Visibility="{Binding IsOldFormat, Converter={StaticResource BoolToVis}}"
                               Margin="0,0,0,4"
                               ToolTip="These commands affect servo driver calibration in real time — use with caution">
                         <WrapPanel Margin="6,4">
                             <Button Content="Track Normally"     Command="{Binding ServoTrackNormalCommand}"  Margin="2" Padding="5,2"
-                                    ToolTip="Resume normal sidereal tracking (:TOA#)"/>
+                                    ToolTip="Resume normal sidereal tracking"/>
                             <Button Content="Track Fixed Rate"   Command="{Binding ServoTrackFixedCommand}"   Margin="2" Padding="5,2"
-                                    ToolTip="Switch to fixed-rate tracking for calibration (:TOF#)"/>
+                                    ToolTip="Switch to fixed-rate tracking for calibration"/>
                             <Button Content="Record Calibration" Command="{Binding ServoRecordCommand}"       Margin="2" Padding="5,2"
-                                    ToolTip="Start recording calibration data (:SXC1,1#)"/>
+                                    ToolTip="Start recording calibration data"/>
                             <Button Content="Stop Recording"     Command="{Binding ServoStopCommand}"         Margin="2" Padding="5,2"
-                                    ToolTip="Stop calibration recording (:SXC1,0#)"/>
+                                    ToolTip="Stop calibration recording"/>
                             <Button Content="Clear Buffer"       Command="{Binding ServoClearCommand}"        Margin="2" Padding="5,2"
-                                    ToolTip="Clear the calibration buffer (:SXC2,0#)"/>
+                                    ToolTip="Clear the calibration buffer"/>
                             <Button Content="Load Calibration"   Command="{Binding ServoLoadCalCommand}"      Margin="2" Padding="5,2"
-                                    ToolTip="Load calibration from NVM (:SXC3,0#)"/>
+                                    ToolTip="Load calibration from NVM"/>
                             <Button Content="Save Calibration"   Command="{Binding ServoSaveCalCommand}"      Margin="2" Padding="5,2"
-                                    ToolTip="Save calibration to NVM (:SXC3,1#)"/>
+                                    ToolTip="Save calibration to NVM"/>
                             <Button Content="Load Backup"        Command="{Binding ServoLoadBackupCommand}"   Margin="2" Padding="5,2"
-                                    ToolTip="Restore calibration from backup (:SXC4,0#)"/>
+                                    ToolTip="Restore calibration from backup"/>
                             <Button Content="Save Backup"        Command="{Binding ServoSaveBackupCommand}"   Margin="2" Padding="5,2"
-                                    ToolTip="Save current calibration as backup (:SXC4,1#)"/>
+                                    ToolTip="Save current calibration as backup"/>
                             <Button Content="High Pass Filter"   Command="{Binding ServoHpfCommand}"          Margin="2" Padding="5,2"
-                                    ToolTip="Apply high-pass filter (:SXC5,1#)"/>
+                                    ToolTip="Apply high-pass filter"/>
                             <Button Content="Low Pass Filter"    Command="{Binding ServoLpfCommand}"          Margin="2" Padding="5,2"
-                                    ToolTip="Apply low-pass filter (:SXC5,0#)"/>
+                                    ToolTip="Apply low-pass filter"/>
                         </WrapPanel>
                     </GroupBox>
 
