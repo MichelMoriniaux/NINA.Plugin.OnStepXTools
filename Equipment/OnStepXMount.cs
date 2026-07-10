@@ -29,9 +29,9 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         // ── Alignment model ──────────────────────────────────────────────────────
 
         public Task<AlignmentModelCoefficients?> GetCoefficientsAsync(CancellationToken ct = default) {
-            return Task.Run(() => {
-                var mountType = GetMountType();
+            return Task.Run( async () => {
                 var c = new AlignmentModelCoefficients();
+                var mountType = await GetMountTypeAsync(ct);
                 c.Ax1Cor = ReadCoefficient(0x00);
                 c.Ax2Cor = ReadCoefficient(0x01);
                 c.AltCor = ReadCoefficient(0x02);
@@ -44,7 +44,10 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 c.Hca    = ReadCoefficient(0x0b);
                 c.Dcp    = ReadCoefficient(0x0c);
                 c.Dca    = ReadCoefficient(0x0d);
-                c.Stars  = ParseInt(_cmd.SendString(OnStepXProtocol.GetStarCount())) ?? 0;
+                // removing this for the time being as for the mount the star count is only relevant to the alignment model
+                // this code is only relevant to the sky model. Additionally calling this resets the star count
+                // c.Stars remain in the Object as it may be useful for model management
+                // c.Stars  = ParseInt(_cmd.SendString(OnStepXProtocol.GetStarCount())) ?? 0;
                 return (AlignmentModelCoefficients?)c;
             }, ct);
         }
@@ -55,19 +58,17 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         public Task<AlignmentControllerStatus> GetAlignmentControllerStatusAsync(CancellationToken ct = default) =>
             Task.Run(() => ParseAlignmentStatus(_cmd.SendString(OnStepXProtocol.AlignmentStatus())), ct);
 
-        public Task<MountType> GetMountTypeAsync(CancellationToken ct = default) =>
-            Task.Run(GetMountType, ct);
-
         public async Task<bool> EnsureModelActivatedAsync(CancellationToken ct = default) {
             var coefficients = await GetCoefficientsAsync(ct);
             if (coefficients == null || !HasModelData(coefficients)) return false;
-            await ForceModelActivationAsync(ct);
+            await ForceModelActivationAsync(ct);   // wonder if this should be forced, what if the user does not want the model to be forcibly activated?
             return true;
         }
 
         // ── Motor config ─────────────────────────────────────────────────────────
         // TODO: verify exact command format against OnStepX firmware src/lib/commands/
-
+        // These methods exist in MountSettingsViewModel.cs they should be pulled in here and called from there
+        // and all of these parameters are called from a single SXAa,i,p call
         public Task<AxisConfig?> GetAxisConfigAsync(int axis, CancellationToken ct = default) =>
             Task.FromResult<AxisConfig?>(null); // placeholder - needs firmware source
 
@@ -87,17 +88,36 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         public Task SetSlewingPidAsync(int axis, PidConfig pid, CancellationToken ct = default) =>
             Task.FromException(new NotSupportedException(
                 "Slewing PID writes are disabled until the OnStepX firmware command form is verified."));
+        // end useless commands
 
         public Task SetMountTypeAsync(MountType type, CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetMountType(type)), ct);
+
+        public Task<MountType> GetMountTypeAsync(CancellationToken ct = default) =>
+            Task.Run(() => (MountType)(ParseInt(_cmd.SendString(OnStepXProtocol.GetMountType())) ?? 0), ct);
 
         public Task RebootAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.Reboot()), ct);
 
         public Task ServoCalibrationAsync(ServoCalibrationCommand cmd, CancellationToken ct = default) =>
-            Task.FromException(new NotSupportedException(
-                "Servo calibration writes are disabled until the OnStepX firmware command forms are verified."));
-
+            Task.Run(() => {
+                // TODO: verify calibration command strings against firmware
+                var lx = cmd switch {
+                    ServoCalibrationCommand.TrackNormally       => OnStepXProtocol.ServoTrackNormal(),
+                    ServoCalibrationCommand.TrackFixedRate      => OnStepXProtocol.ServoTrackFixed(),
+                    ServoCalibrationCommand.RecordCalibration   => OnStepXProtocol.ServoRecord(),
+                    ServoCalibrationCommand.StopRecording       => OnStepXProtocol.ServoStop(),
+                    ServoCalibrationCommand.ClearBuffer         => OnStepXProtocol.ServoClear(),
+                    ServoCalibrationCommand.LoadCalibration     => OnStepXProtocol.ServoLoadCal(),
+                    ServoCalibrationCommand.SaveCalibration     => OnStepXProtocol.ServoSaveCal(),
+                    ServoCalibrationCommand.LoadBackup          => OnStepXProtocol.ServoLoadBackup(),
+                    ServoCalibrationCommand.SaveBackup          => OnStepXProtocol.ServoSaveBackup(),
+                    ServoCalibrationCommand.HighPassFilter      => OnStepXProtocol.ServoHpf(),
+                    ServoCalibrationCommand.LowPassFilter       => OnStepXProtocol.ServoLpf(),
+                    _ => null
+                };
+                if (lx != null) _cmd.SendBlind(lx);
+            }, ct);
         // ── Settings ─────────────────────────────────────────────────────────────
 
         public Task SetLocationAsync(double longitudeDeg, double latitudeDeg, double elevationM, CancellationToken ct = default) =>
@@ -127,8 +147,8 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         public Task ResetTrackingFrequencyAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.TrackingFrequencyReset()), ct);
 
-        public Task ResetMountAtHomeAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.ResetMountAtHome()), ct);
+        public Task SetHomePositionAsync(CancellationToken ct = default) =>
+            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetHomePosition()), ct);
 
         public Task SetParkPositionAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetParkPosition()), ct);
@@ -196,16 +216,16 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             Task.Run(() => SendAck(OnStepXProtocol.AlignmentActivate()), ct);
 
         public Task WriteCoefficientsAsync(AlignmentModelCoefficients c, CancellationToken ct = default) {
-            return Task.Run(() => {
-                var mountType = GetMountType();
+            return Task.Run( async () => {
                 var expected = RoundCoefficients(c);
+                var mountType = await GetMountTypeAsync(ct);
                 SendAck(OnStepXProtocol.SetCoefficient(0x00, expected.Ax1Cor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x01, expected.Ax2Cor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x02, expected.AltCor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x03, expected.AzmCor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x04, expected.DoCor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x05, expected.PdCor));
-                SendAck(OnStepXProtocol.SetDfCor(expected.DfCor, mountType));
+                SendAck(OnStepXProtocol.SetCoefficient(OnStepXProtocol.IsForkOrAltAz(mountType) ? 0x06 : 0x07, expected.DfCor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x08, expected.TfCor));
                 SendAck(OnStepXProtocol.SetCoefficient(0x0a, expected.Hcp));
                 SendAck(OnStepXProtocol.SetCoefficient(0x0b, expected.Hca));
@@ -213,6 +233,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 SendAck(OnStepXProtocol.SetCoefficient(0x0d, expected.Dca));
                 SendAck(OnStepXProtocol.AlignmentActivate());
 
+                // reread from the mount to verify that the coefficients were properly written
                 var actual = GetCoefficientsAsync(ct).GetAwaiter().GetResult();
                 if (actual == null || !CoefficientsMatch(expected, RoundCoefficients(actual))) {
                     throw new InvalidOperationException("OnStepX coefficient write verification failed.");
@@ -266,11 +287,6 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         private int ReadCoefficient(int hexRegister) =>
             ParseInt(_cmd.SendString(OnStepXProtocol.GetCoefficient(hexRegister))) ?? 0;
 
-        private MountType GetMountType() {
-            var raw = ParseInt(_cmd.SendString(OnStepXProtocol.GetMountType())) ?? (int)MountType.GEM;
-            return Enum.IsDefined(typeof(MountType), raw) ? (MountType)raw : MountType.GEM;
-        }
-
         private static AlignmentControllerStatus ParseAlignmentStatus(string? raw) {
             raw ??= string.Empty;
             var max = raw.Length > 0 && char.IsDigit(raw[0]) ? raw[0] - '0' : 0;
@@ -323,6 +339,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                    rounded.Dcp != 0 || rounded.Dca != 0;
         }
 
+        // TODO: why? we have AlignmentModelCoefficients that is very similar
         private sealed class RoundedCoefficients {
             public int Ax1Cor { get; init; }
             public int Ax2Cor { get; init; }

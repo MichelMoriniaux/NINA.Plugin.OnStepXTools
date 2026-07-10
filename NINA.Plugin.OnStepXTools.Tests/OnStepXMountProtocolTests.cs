@@ -66,7 +66,7 @@ namespace NINA.Plugin.OnStepXTools.Tests {
             var simulator = new OnStepXSimulator();
             var mount = new OnStepXMount(simulator);
 
-            await mount.ResetMountAtHomeAsync();
+            await mount.SetHomePositionAsync();
             await mount.SetPauseAtHomeAsync(true);
             await mount.SetGotoBuzzerAsync(true);
             await mount.SetAutoMeridianFlipAsync(true);

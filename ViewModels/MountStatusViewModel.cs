@@ -7,6 +7,7 @@ using NINA.Core.Utility;
 using NINA.Equipment.Equipment.MyTelescope;
 using NINA.Equipment.Interfaces.Mediator;
 using NINA.Equipment.Interfaces.ViewModel;
+using NINA.Plugin.OnStepXTools.Equipment;
 using NINA.Profile.Interfaces;
 using NINA.WPF.Base.ViewModel;
 
@@ -176,11 +177,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private void PollWeather() {
             try {
-                var temp = GetDouble(":GX9A#");
-                var pres = GetDouble(":GX9B#");
-                var hum  = GetDouble(":GX9C#");
-                var dew  = GetDouble(":GX9E#");
-                var ctmp = GetDouble(":GX9F#");
+                var temp = GetDouble(OnStepXProtocol.GetWeatherTemperature());
+                var pres = GetDouble(OnStepXProtocol.GetWeatherPressure());
+                var hum  = GetDouble(OnStepXProtocol.GetWeatherHumidity());
+                var dew  = GetDouble(OnStepXProtocol.GetWeatherDewpoint());
+                var ctmp = GetDouble(OnStepXProtocol.GetControllerTemperature());
                 var err  = GetLastErrorFromGu();
 
                 System.Windows.Application.Current?.Dispatcher.Invoke(() => {
@@ -212,8 +213,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             } catch { return null; }
         }
 
+        // maybe get this from OnStepXMount.cs (merge with struff from settings pane)
         private string? GetLastErrorFromGu() {
-            var gu = GetString(":GU#");
+            var gu = GetString(OnStepXProtocol.GetStatus());
             if (string.IsNullOrWhiteSpace(gu)) return null;
             return gu[^1].ToString(CultureInfo.InvariantCulture);
         }
