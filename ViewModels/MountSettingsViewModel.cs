@@ -77,6 +77,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 try { ParseFirmwareVersion(GetStr(OnStepXProtocol.GetFirmwareVersion()) ?? string.Empty); } catch { }
                 _ = _mount.EnsureModelActivatedAsync();
                 _ = LoadAllSettingsAsync();
+                // it looks like the Ascom driver never actually uploads the Elevation to the mount,
+                // it only updates the NINA representation, so we correct that here
+                _ = SetMountLocationAsync();
             }
             _wasConnected = info.Connected;
         }
@@ -307,19 +310,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 StatusMessage = "Limits updated.";
             }, _ => Connected());
 
-            SyncSiteFromNinaCommand = new RelayCommand(async _ => {
-                try {
-                    var lat  = _profile.ActiveProfile.AstrometrySettings.Latitude;
-                    var lon  = _profile.ActiveProfile.AstrometrySettings.Longitude;
-                    var elev = _telescope.GetInfo().SiteElevation; // mount's current elevation
-                    await _mount.SetLocationAsync(lon, lat, elev);
-                    StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F1} m";
-                    await Task.Delay(200);
-                    await LoadAllSettingsAsync();
-                } catch (Exception ex) {
-                    StatusMessage = $"Error: {ex.Message}";
-                }
-            }, _ => Connected());
+            SyncSiteFromNinaCommand = new RelayCommand(async _ => await SetMountLocationAsync(), _ => Connected());
 
             // void Status(string cmd) { try { _telescope.SendCommandString(cmd, raw: true); } catch { } }
 
@@ -359,6 +350,20 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // ── Load settings ────────────────────────────────────────────────────────
 
+        private async Task SetMountLocationAsync()
+        {
+            try {
+                var lat  = _profile.ActiveProfile.AstrometrySettings.Latitude;
+                var lon  = _profile.ActiveProfile.AstrometrySettings.Longitude;
+                var elev = _profile.ActiveProfile.AstrometrySettings.Elevation;
+                await _mount.SetLocationAsync(lon, lat, elev);
+                StatusMessage = $"Site synced from N.I.N.A.: {lat:F4}°  {lon:F4}°  {elev:F1} m";
+                // await Task.Delay(200);
+                // await LoadAllSettingsAsync();
+            } catch (Exception ex) {
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
         private async Task LoadAllSettingsAsync() {
             StatusMessage = "Reading mount settings…";
             try {
