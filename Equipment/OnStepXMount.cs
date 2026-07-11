@@ -122,9 +122,12 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
 
         public Task SetLocationAsync(double longitudeDeg, double latitudeDeg, double elevationM, CancellationToken ct = default) =>
             Task.Run(() => {
-                _cmd.SendBlind(OnStepXProtocol.Latitude(latitudeDeg));
-                _cmd.SendBlind(OnStepXProtocol.LongitudeFromEastPositive(longitudeDeg));
-                _cmd.SendBlind(OnStepXProtocol.Elevation(elevationM));
+                // The ASCOM.OnStep driver's IP transport can drop the reply to raw commands sent
+                // back-to-back ("SendMessageIP failed: no command/response after 3 attempts") -
+                // pace them out to give each round-trip time to complete.
+                _cmd.SendAck(OnStepXProtocol.Latitude(latitudeDeg));
+                _cmd.SendAck(OnStepXProtocol.LongitudeFromEastPositive(longitudeDeg));
+                _cmd.SendAck(OnStepXProtocol.Elevation(elevationM));
             }, ct);
 
         public Task SetTrackingAsync(bool enabled, CancellationToken ct = default) =>
@@ -191,47 +194,47 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         // ── Alignment ────────────────────────────────────────────────────────────
 
         public Task ClearAlignmentModelAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(OnStepXProtocol.AlignmentReset()), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.AlignmentReset()), ct);
 
         public Task UploadAlignmentStarAsync(
             double actualHAHours, double actualDecDeg,
             double mountHAHours,  double mountDecDeg,
             int pierSide, CancellationToken ct = default) {
             return Task.Run(() => {
-                SendAck(OnStepXProtocol.StarActualHa(actualHAHours));
-                SendAck(OnStepXProtocol.StarActualDec(actualDecDeg));
-                SendAck(OnStepXProtocol.StarMountHa(mountHAHours));
-                SendAck(OnStepXProtocol.StarMountDec(mountDecDeg));
-                SendAck(OnStepXProtocol.StarCommit(pierSide));
+                _cmd.SendAck(OnStepXProtocol.StarActualHa(actualHAHours));
+                _cmd.SendAck(OnStepXProtocol.StarActualDec(actualDecDeg));
+                _cmd.SendAck(OnStepXProtocol.StarMountHa(mountHAHours));
+                _cmd.SendAck(OnStepXProtocol.StarMountDec(mountDecDeg));
+                _cmd.SendAck(OnStepXProtocol.StarCommit(pierSide));
             }, ct);
         }
 
         public Task ComputeAlignmentOnControllerAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(OnStepXProtocol.AlignmentCompute()), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.AlignmentCompute()), ct);
 
         public Task SaveAlignmentToEepromAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(OnStepXProtocol.AlignmentWriteNv()), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.AlignmentWriteNv()), ct);
 
         public Task ForceModelActivationAsync(CancellationToken ct = default) =>
-            Task.Run(() => SendAck(OnStepXProtocol.AlignmentActivate()), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.AlignmentActivate()), ct);
 
         public Task WriteCoefficientsAsync(AlignmentModelCoefficients c, CancellationToken ct = default) {
             return Task.Run( async () => {
                 var expected = RoundCoefficients(c);
                 var mountType = await GetMountTypeAsync(ct);
-                SendAck(OnStepXProtocol.SetCoefficient(0x00, expected.Ax1Cor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x01, expected.Ax2Cor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x02, expected.AltCor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x03, expected.AzmCor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x04, expected.DoCor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x05, expected.PdCor));
-                SendAck(OnStepXProtocol.SetCoefficient(OnStepXProtocol.IsForkOrAltAz(mountType) ? 0x06 : 0x07, expected.DfCor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x08, expected.TfCor));
-                SendAck(OnStepXProtocol.SetCoefficient(0x0a, expected.Hcp));
-                SendAck(OnStepXProtocol.SetCoefficient(0x0b, expected.Hca));
-                SendAck(OnStepXProtocol.SetCoefficient(0x0c, expected.Dcp));
-                SendAck(OnStepXProtocol.SetCoefficient(0x0d, expected.Dca));
-                SendAck(OnStepXProtocol.AlignmentActivate());
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x00, expected.Ax1Cor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x01, expected.Ax2Cor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x02, expected.AltCor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x03, expected.AzmCor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x04, expected.DoCor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x05, expected.PdCor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(OnStepXProtocol.IsForkOrAltAz(mountType) ? 0x06 : 0x07, expected.DfCor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x08, expected.TfCor));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x0a, expected.Hcp));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x0b, expected.Hca));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x0c, expected.Dcp));
+                _cmd.SendAck(OnStepXProtocol.SetCoefficient(0x0d, expected.Dca));
+                _cmd.SendAck(OnStepXProtocol.AlignmentActivate());
 
                 // reread from the mount to verify that the coefficients were properly written
                 var actual = GetCoefficientsAsync(ct).GetAwaiter().GetResult();
@@ -242,13 +245,6 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────
-
-        private void SendAck(string command) {
-            if (_cmd.SendBool(command)) return;
-
-            Logger.Error($"OnStepX command rejected or failed: {command}");
-            throw new InvalidOperationException($"OnStepX rejected command {command}");
-        }
 
         private static double? ParseHMS(string? s) {
             if (s == null) return null;

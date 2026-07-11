@@ -5,9 +5,14 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
     public class HorizonAndMeridianFilter {
         private readonly IProfileService _profile;
+        private readonly double? _meridianExclusionHalfWidthDegOverride;
 
-        public HorizonAndMeridianFilter(IProfileService profile) {
+        // meridianExclusionHalfWidthDegOverride: when set, takes precedence over the value
+        // derived from NINA's own MeridianFlipSettings.MinutesAfterMeridian - lets callers
+        // (e.g. the point generation UI) honor a user-edited exclusion width.
+        public HorizonAndMeridianFilter(IProfileService profile, double? meridianExclusionHalfWidthDegOverride = null) {
             _profile = profile;
+            _meridianExclusionHalfWidthDegOverride = meridianExclusionHalfWidthDegOverride;
         }
 
         // Altitude/azimuth visibility check used by GoldenSpiral, AutoGrid, Random.
@@ -46,6 +51,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         // Returns the meridian exclusion half-width in degrees of HA.
         // MinutesAfterMeridian × 0.25 deg/min (15°/h ÷ 60 min/h)
         public double MeridianExclusionHalfWidthDeg() {
+            if (_meridianExclusionHalfWidthDegOverride.HasValue)
+                return _meridianExclusionHalfWidthDegOverride.Value;
             var minutes = _profile.ActiveProfile.MeridianFlipSettings.MinutesAfterMeridian;
             return minutes * 0.25;
         }

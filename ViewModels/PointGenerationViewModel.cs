@@ -357,7 +357,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         // ── Point generation ─────────────────────────────────────────────────────
 
         private void Generate() {
-            var filter = new HorizonAndMeridianFilter(_profile);
+            var filter = new HorizonAndMeridianFilter(_profile, _meridianExclusionDeg);
             Options.SiteLatitudeDeg           = _profile.ActiveProfile.AstrometrySettings.Latitude;
             Options.MeridianExclusionHalfWidthDeg = _meridianExclusionDeg;
             Options.Method                    = _selectedMethod;

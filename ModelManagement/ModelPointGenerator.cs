@@ -16,7 +16,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             var raw = opts.Method switch {
                 GenerationMethod.GoldenSpiral  => GoldenSpiral(opts),
                 GenerationMethod.SiderealPath  => SiderealPath(opts, filter),
-                GenerationMethod.AutoGrid      => AutoGrid(opts),
+                GenerationMethod.AutoGrid      => AutoGrid(opts, filter),
                 GenerationMethod.Random        => Random(opts),
                 _                              => GoldenSpiral(opts)
             };
@@ -87,7 +87,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         //   • n_alt = round( sqrt(n × altRange / 360) )
         //   • n_az_i = round( n × cos(alt_i) / Σ cos(alt_j) )   ← equal-area weighting
         //   • Alternating rows are offset by half a step for better coverage.
-        private static List<AlignmentPoint> AutoGrid(PointGenerationOptions opts) {
+        private static List<AlignmentPoint> AutoGrid(PointGenerationOptions opts, HorizonAndMeridianFilter? filter) {
             double altMin   = opts.MinAltitudeDeg;
             double altMax   = opts.MaxAltitudeDeg;
             double altRange = altMax - altMin;
@@ -107,6 +107,10 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 cosSum      += bandCos[i];
             }
 
+            // Start each row just outside the meridian exclusion zone (Az=0°) rather than
+            // at an arbitrary angle, so no point is wasted landing inside the excluded band.
+            double azStart = filter?.MeridianExclusionHalfWidthDeg() ?? 0.0;
+
             var points = new List<AlignmentPoint>(n + n_alt);
             for (int i = 0; i < n_alt; i++) {
                 // Equal-area: weight by circumference at this altitude
@@ -115,7 +119,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 for (int j = 0; j < n_az; j++) {
                     // Offset alternating rows by half a step - breaks up the grid lines
                     double offset = (i % 2 == 0) ? 0.0 : 0.5;
-                    double azDeg  = 360.0 / n_az * (j + offset);
+                    double azDeg  = (360.0 / n_az * (j + offset) + azStart) % 360.0;
                     points.Add(new AlignmentPoint {
                         AltitudeDeg = bandAlts[i],
                         AzimuthDeg  = azDeg
@@ -162,8 +166,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
             double[] decs = { target - step, target, target + step };
 
-            int    haSteps = Math.Max(4, opts.PointCount / decs.Length);
-            double haInc   = haRange / haSteps;
+            int    haSteps = Math.Max(0, (int)Math.Round((double)opts.PointCount / decs.Length) - 1);
+            double haInc   = haSteps > 0 ? haRange / haSteps : 0.0;
 
             for (int bandIdx = 0; bandIdx < decs.Length; bandIdx++) {
                 double dec     = decs[bandIdx];

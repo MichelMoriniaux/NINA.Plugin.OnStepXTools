@@ -47,6 +47,17 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             }
         }
 
+        public void SendAck(string command) {
+            try
+            {
+                if (SendBool(command)) return;
+            } catch (Exception ex) {
+                Logger.Error($"LX200 SendAck command rejected or failed: {command}: {ex.Message}");
+                throw new InvalidOperationException($"LX200 rejected command {command}");
+            }
+        }
+
+
         // Parse double from command response, returning default on parse failure.
         public double? GetDouble(string command) {
             try {
