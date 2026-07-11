@@ -364,6 +364,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 StatusMessage = $"Error: {ex.Message}";
             }
         }
+        
         private async Task LoadAllSettingsAsync() {
             StatusMessage = "Reading mount settings…";
             try {

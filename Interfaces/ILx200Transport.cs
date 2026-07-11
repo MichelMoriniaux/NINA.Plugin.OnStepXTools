@@ -4,5 +4,6 @@ namespace NINA.Plugin.OnStepXTools.Interfaces {
         string? SendString(string command);
         bool SendBlind(string command);
         bool SendBool(string command);
+        void SendAck(string command);
     }
 }

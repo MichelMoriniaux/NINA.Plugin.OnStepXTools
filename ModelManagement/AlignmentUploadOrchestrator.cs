@@ -44,6 +44,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                         point.PierSide,
                         ct);
                     point.State = AlignmentPointState.Added;
+                    Logger.Debug("OnStepX alignment point uploaded");
                 }
 
                 await mount.ComputeAlignmentOnControllerAsync(ct);
@@ -56,7 +57,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                     throw new InvalidOperationException(
                         $"OnStepX alignment verification failed: expected {uploadable.Count} stars, read back {stars}.");
 
-                var coefficients = await mount.GetCoefficientsAsync(ct);
+                var coefficients = await GetCoefficientsWithRetryAsync(mount, delayAsync, ct);
                 if (coefficients == null || !HasAnyCoefficient(coefficients))
                     throw new InvalidOperationException("OnStepX alignment verification failed: no computed coefficients were read back.");
 
@@ -75,6 +76,34 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
         public static TimeSpan ComputeWait(int stars) =>
             TimeSpan.FromSeconds(Math.Min(2.0 + 0.5 * Math.Max(1, stars), 15.0));
+
+        // Retries up to 3 attempts with exponential backoff (5s, 10s), bailing out once the
+        // 1-minute overall budget is exhausted so a slow/unresponsive controller can't hang the upload.
+        private static async Task<AlignmentModelCoefficients?> GetCoefficientsWithRetryAsync(
+            IOnStepXMount mount,
+            Func<TimeSpan, CancellationToken, Task>? delayAsync,
+            CancellationToken ct) {
+
+            const int maxAttempts = 3;
+            var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(1);
+            var backoff = TimeSpan.FromSeconds(5);
+            delayAsync ??= Task.Delay;
+
+            for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+                var coefficients = await mount.GetCoefficientsAsync(ct);
+                if (coefficients != null && HasAnyCoefficient(coefficients))
+                    return coefficients;
+
+                var timeLeft = deadline - DateTime.UtcNow;
+                if (attempt == maxAttempts || timeLeft <= TimeSpan.Zero)
+                    return coefficients;
+
+                await delayAsync(backoff <= timeLeft ? backoff : timeLeft, ct);
+                backoff += backoff;
+            }
+
+            return null;
+        }
 
         private static bool HasAnyCoefficient(AlignmentModelCoefficients c) =>
             Math.Abs(c.Ax1Cor) > 0.5 ||
