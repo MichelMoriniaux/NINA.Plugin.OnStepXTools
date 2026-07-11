@@ -21,14 +21,13 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         public string? SendString(string command) {
             try {
                 var result = _telescope.SendCommandString(command, raw: true);
-                return result?.TrimEnd('#');
+                return string.IsNullOrWhiteSpace(result) ? null : result.TrimEnd('#').Trim();
             } catch (Exception ex) {
-                Logger.Error($"LX200 SendString failed for '{command}': {ex.Message}");
+                Logger.Error($"LX200 SendString failed for '{command}': {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
 
-        // Send command with no expected response.
         public bool SendBlind(string command) {
             try {
                 _telescope.SendCommandBlind(command, raw: true);
@@ -38,7 +37,6 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                 return false;
             }
         }
-
         // Send command, return "1" on success / "0" on failure.
         public bool SendBool(string command) {
             try {
@@ -51,10 +49,16 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
 
         // Parse double from command response, returning default on parse failure.
         public double? GetDouble(string command) {
-            var raw = SendString(command);
-            if (raw == null) return null;
-            return double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+            try {
+                var raw = _telescope.SendCommandString(command, raw: true);
+                if (string.IsNullOrWhiteSpace(raw)) return null;
+                raw = raw.TrimEnd('#').Trim();
+                return double.TryParse(raw, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+            } catch (Exception ex) {
+                Logger.Error($"LX200 GetDouble failed for '{command}': {ex.Message}");
+                return null;
+            }
         }
 
         // Parse int from command response.

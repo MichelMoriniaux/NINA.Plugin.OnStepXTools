@@ -17,7 +17,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
     [PartCreationPolicy(CreationPolicy.Shared)]
     public class MountStatusViewModel : DockableVM, ITelescopeConsumer, IDisposable {
         private readonly ITelescopeMediator _telescope;
-        private CancellationTokenSource? _weatherCts;
+        private CancellationTokenSource?    _weatherCts;
+        private readonly LX200Commander     _cmd;
 
         public override string ContentId => "OnStepX_MountStatus";
 
@@ -28,6 +29,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             ImageGeometry = System.Windows.Application.Current?.Resources["TelescopeSVG"] as System.Windows.Media.GeometryGroup;
             _telescope    = telescope;
             _telescope.RegisterConsumer(this);
+            _cmd          = new LX200Commander(telescope);
             StartWeatherPolling();
         }
 
@@ -177,11 +179,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private void PollWeather() {
             try {
-                var temp = GetDouble(OnStepXProtocol.GetWeatherTemperature());
-                var pres = GetDouble(OnStepXProtocol.GetWeatherPressure());
-                var hum  = GetDouble(OnStepXProtocol.GetWeatherHumidity());
-                var dew  = GetDouble(OnStepXProtocol.GetWeatherDewpoint());
-                var ctmp = GetDouble(OnStepXProtocol.GetControllerTemperature());
+                var temp = _cmd.GetDouble(OnStepXProtocol.GetWeatherTemperature());
+                var pres = _cmd.GetDouble(OnStepXProtocol.GetWeatherPressure());
+                var hum  = _cmd.GetDouble(OnStepXProtocol.GetWeatherHumidity());
+                var dew  = _cmd.GetDouble(OnStepXProtocol.GetWeatherDewpoint());
+                var ctmp = _cmd.GetDouble(OnStepXProtocol.GetControllerTemperature());
                 var err  = GetLastErrorFromGu();
 
                 System.Windows.Application.Current?.Dispatcher.Invoke(() => {
@@ -197,25 +199,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }
         }
 
-        private double? GetDouble(string cmd) {
-            try {
-                var r = _telescope.SendCommandString(cmd, raw: true);
-                if (string.IsNullOrWhiteSpace(r)) return null;
-                r = r.TrimEnd('#').Trim();
-                return double.TryParse(r, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : null;
-            } catch { return null; }
-        }
-
-        private string? GetString(string cmd) {
-            try {
-                var r = _telescope.SendCommandString(cmd, raw: true);
-                return string.IsNullOrWhiteSpace(r) ? null : r.TrimEnd('#').Trim();
-            } catch { return null; }
-        }
-
         // maybe get this from OnStepXMount.cs (merge with struff from settings pane)
         private string? GetLastErrorFromGu() {
-            var gu = GetString(OnStepXProtocol.GetStatus());
+            var gu = _cmd.SendString(OnStepXProtocol.GetStatus());
             if (string.IsNullOrWhiteSpace(gu)) return null;
             return gu[^1].ToString(CultureInfo.InvariantCulture);
         }
