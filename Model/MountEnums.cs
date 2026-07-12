@@ -35,6 +35,23 @@ namespace NINA.Plugin.OnStepXTools.Model {
         GridSearch
     }
 
+    // Which formula GridSearchPointingModelSolver assumes GeoAlign::mountToObservedPlace()
+    // uses to apply hcp/hca/dcp/dca. As of the OnStepX source reviewed 2026-07, the firmware
+    // evaluates cos(a + hcp) where "a" is the tiny polar-misalignment residual term - almost
+    // certainly a bug (see the upstream report), since the forward transform
+    // (observedPlaceToMount()) instead behaves as if it were cos(axisAngle + hcp). Reported
+    // upstream; not yet fixed as of this writing.
+    public enum HarmonicTermConvention {
+        // Matches currently-shipped firmware exactly: cos(polarResidual + hcp)*hca*side.
+        // Use this for any mount running firmware without the upstream fix.
+        PolarResidualLegacy,
+        // Matches the proposed/corrected formula: cos(axisAngle + hcp)*hca*side, periodic in
+        // the actual mount axis position. Switch a mount to this once its firmware is
+        // confirmed to include the fix (check the reported issue for the fixed version
+        // number once one exists).
+        AxisAngleFixed
+    }
+
     public enum ServoCalibrationCommand {
         TrackNormally,
         TrackFixedRate,

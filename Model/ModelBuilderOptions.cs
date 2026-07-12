@@ -19,5 +19,10 @@ namespace NINA.Plugin.OnStepXTools.Model {
         // Which solver builds coefficients in FullSkyPointingModel mode. Defaults to the
         // existing least-squares solver so behavior is unchanged unless explicitly opted in.
         public PointingSolverMethod SolverMethod { get; set; } = PointingSolverMethod.LeastSquares;
+        // Only consulted when SolverMethod == GridSearch. Defaults to matching currently-
+        // shipped OnStepX firmware's (likely buggy) hcp/hca/dcp/dca behavior - see
+        // GridSearchPointingModelSolver and HarmonicTermConvention. Flip to AxisAngleFixed
+        // once a given mount's firmware is confirmed to include the upstream fix.
+        public HarmonicTermConvention HarmonicTermConvention { get; set; } = HarmonicTermConvention.PolarResidualLegacy;
     }
 }

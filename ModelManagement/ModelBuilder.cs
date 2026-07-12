@@ -127,7 +127,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
                 if (opts.SolverMethod == PointingSolverMethod.GridSearch) {
                     var mountType = await _mount.GetMountTypeAsync(ct);
-                    coefficients = GridSearchPointingModelSolver.Solve(goodPoints, siteLat, mountType);
+                    coefficients = GridSearchPointingModelSolver.Solve(
+                        goodPoints, siteLat, mountType, opts.HarmonicTermConvention);
                 } else {
                     coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
                 }

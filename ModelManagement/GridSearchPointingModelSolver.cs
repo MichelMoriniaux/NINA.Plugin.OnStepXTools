@@ -24,6 +24,15 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
     // polar-misalignment term, not the raw axis angle - see PointingModelSolver's class
     // comment for the full writeup). Phase 2 grid-searches hcp/hca and dcp/dca against
     // that real nonlinear formula, holding the Phase 1 result fixed.
+    //
+    // Which nonlinear formula Phase 2 targets is controlled by HarmonicTermConvention.
+    // mountToObservedPlace()'s cos(a1+hcp) is very likely an upstream firmware bug: "a1" is
+    // meant to track the axis angle (that's how observedPlaceToMount()'s iterative loop uses
+    // the same variable name), but mountToObservedPlace() instead computes it as only the
+    // tiny polar-misalignment residual - see HarmonicTermConvention's comment and the
+    // upstream bug report this was reported as. Default to PolarResidualLegacy since that's
+    // what every shipped firmware actually runs today; switch a given mount over to
+    // AxisAngleFixed once its firmware is confirmed to include the fix.
     public static class GridSearchPointingModelSolver {
 
         private const double Deg180 = Math.PI;
@@ -44,7 +53,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         public static AlignmentModelCoefficients? Solve(
             IReadOnlyList<SavedModelPoint> points,
             double siteLatitudeDeg = 45.0,
-            MountType mountType = MountType.GEM) {
+            MountType mountType = MountType.GEM,
+            HarmonicTermConvention harmonicTermConvention = HarmonicTermConvention.PolarResidualLegacy) {
 
             int n = points.Count;
             if (n < 6) return null;
@@ -89,7 +99,7 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 Stars  = n
             };
 
-            SolveHarmonicTerms(stars, coeffs, cosLat, sinLat);
+            SolveHarmonicTerms(stars, coeffs, cosLat, sinLat, harmonicTermConvention);
 
             return coeffs;
         }
@@ -269,7 +279,8 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
         // here (COSh only affects the HA residual, COSd only the Dec residual), so they're
         // solved as two independent 2-D searches rather than one combined one.
         private static void SolveHarmonicTerms(
-            StarPoint[] stars, AlignmentModelCoefficients coeffs, double cosLat, double sinLat) {
+            StarPoint[] stars, AlignmentModelCoefficients coeffs, double cosLat, double sinLat,
+            HarmonicTermConvention convention) {
 
             int n = stars.Length;
             var a1 = new double[n]; var a2 = new double[n];
@@ -298,7 +309,12 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
                 double thisA1 = -azmCor * cosAx1 * tanAx2 + altCor * sinAx1 * tanAx2;
                 double thisA2 = azmCor * sinAx1 + altCor * cosAx1;
-                a1[l] = thisA1; a2[l] = thisA2;
+
+                // The polar-residual term (thisA1/thisA2) always contributes to the rest of
+                // the correction regardless of convention - only the cos()'s phase argument
+                // changes between the two conventions.
+                a1[l] = convention == HarmonicTermConvention.AxisAngleFixed ? mAx1 : thisA1;
+                a2[l] = convention == HarmonicTermConvention.AxisAngleFixed ? mAx2 : thisA2;
 
                 double doh = doCor * (1.0 / cosAx2) * p;
                 double pdh = -pdCor * tanAx2 * p;
@@ -339,11 +355,26 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             StarPoint[] stars, double[] a, double[] residNoHarmonic, int[] side, bool isAx1,
             double[] cosActualAx2) {
 
-            int n = stars.Length;
             double bestPhaseDeg = 0, bestAmpArcsec = 0, bestDist = double.MaxValue;
 
-            double phaseStep = 30.0, ampStep = 64.0;
-            double phaseCenter = 0, ampCenter = 0;
+            // A ±3-step coarse-to-fine refinement starting from (0,0) can anchor on the wrong
+            // neighborhood before it ever gets close to the true (phase, amplitude) and then
+            // never escape it (halving only ever narrows around the current best). Do one
+            // dense full sweep first to find a reasonable starting neighborhood, then refine.
+            for (double phaseDeg = -180.0; phaseDeg < 180.0; phaseDeg += 15.0) {
+                double phaseRad = phaseDeg * Math.PI / 180.0;
+                for (double ampArcsec = -MaxHarmonicAmplitudeArcsec; ampArcsec <= MaxHarmonicAmplitudeArcsec; ampArcsec += 25.0) {
+                    double dist = Residual(stars, a, residNoHarmonic, side, isAx1, cosActualAx2, phaseRad, ArcsecToRad(ampArcsec));
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestPhaseDeg = phaseDeg;
+                        bestAmpArcsec = ampArcsec;
+                    }
+                }
+            }
+
+            double phaseStep = 15.0, ampStep = 25.0;
+            double phaseCenter = bestPhaseDeg, ampCenter = bestAmpArcsec;
 
             for (int pass = 0; pass < 8; pass++) {
                 double bestPassPhase = phaseCenter, bestPassAmp = ampCenter, bestPassDist = double.MaxValue;
@@ -355,21 +386,9 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                     for (int ai = -3; ai <= 3; ai++) {
                         double ampArcsec = Math.Clamp(ampCenter + ai * ampStep,
                             -MaxHarmonicAmplitudeArcsec, MaxHarmonicAmplitudeArcsec);
-                        double amp = ArcsecToRad(ampArcsec);
 
-                        double sum = 0;
-                        for (int l = 0; l < n; l++) {
-                            double cos = amp * Math.Cos(a[l] + phaseRad) * side[l];
-                            // residNoHarmonic = mount - (restOfCorrection); full delta matches
-                            // doSearch()'s "actual - (mount - correction)" pattern with the
-                            // cos() term folded into the correction.
-                            double d = isAx1
-                                ? WrapPi(stars[l].ActualAx1 - (residNoHarmonic[l] - cos))
-                                : stars[l].ActualAx2 - (residNoHarmonic[l] - cos);
-                            double weighted = isAx1 ? d * cosActualAx2[l] : d;
-                            sum += weighted * weighted;
-                        }
-                        double dist = sum / Math.Max(1, n - 1);
+                        double dist = Residual(stars, a, residNoHarmonic, side, isAx1, cosActualAx2,
+                            phaseRad, ArcsecToRad(ampArcsec));
 
                         if (dist < bestPassDist) {
                             bestPassDist = dist;
@@ -392,6 +411,27 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             }
 
             return (NormalizeDeg(bestPhaseDeg), Math.Abs(bestAmpArcsec));
+        }
+
+        // Sum-of-squares residual (same metric doSearch() uses) for a single candidate
+        // (phaseRad, amp) evaluated against the real cos(a + phase)*amp*side formula.
+        private static double Residual(
+            StarPoint[] stars, double[] a, double[] residNoHarmonic, int[] side, bool isAx1,
+            double[] cosActualAx2, double phaseRad, double amp) {
+
+            int n = stars.Length;
+            double sum = 0;
+            for (int l = 0; l < n; l++) {
+                double cos = amp * Math.Cos(a[l] + phaseRad) * side[l];
+                // residNoHarmonic = mount - (restOfCorrection); full delta matches doSearch()'s
+                // "actual - (mount - correction)" pattern with the cos() term folded in.
+                double d = isAx1
+                    ? WrapPi(stars[l].ActualAx1 - (residNoHarmonic[l] - cos))
+                    : stars[l].ActualAx2 - (residNoHarmonic[l] - cos);
+                double weighted = isAx1 ? d * cosActualAx2[l] : d;
+                sum += weighted * weighted;
+            }
+            return sum / Math.Max(1, n - 1);
         }
 
         private static double WrapPi(double x) {

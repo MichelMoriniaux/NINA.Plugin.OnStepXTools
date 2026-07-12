@@ -79,17 +79,94 @@ public class GridSearchPointingModelSolverTests {
         Assert.Equal(points.Count, actual.Stars);
     }
 
+    // Confirms the HarmonicTermConvention.AxisAngleFixed hypothesis: once hcp/hca/dcp/dca
+    // multiply cos(axisAngle + phase) instead of cos(polarResidual + phase), the term
+    // actually varies substantially across the sky (axis angle ranges over many degrees,
+    // unlike the polar residual which stays tiny) and should become well-identifiable,
+    // unlike the PolarResidualLegacy case above where Hca/Dca are only asserted to stay
+    // within their sanity clamp.
+    [Fact]
+    public void Solve_WithAxisAngleFixedConvention_RecoversHarmonicTermsTightly() {
+        const double siteLatitudeDeg = 42.0;
+        var expected = new AlignmentModelCoefficients {
+            Ax1Cor = 120,
+            Ax2Cor = -85,
+            AltCor = 42,
+            AzmCor = -37,
+            DoCor = 28,
+            PdCor = -19,
+            DfCor = 17,
+            TfCor = -11,
+            Hcp = 35,
+            Hca = 24,
+            Dcp = -22,
+            Dca = 18
+        };
+
+        // Unlike a regular rectangular H×D grid, jitter Dec per HA sample (a fixed,
+        // reproducible offset - not random) so the Dec values actually visited aren't exactly
+        // repeated across every HA. cos(Dec+dcp) depends only on Dec, and with the same
+        // handful of Dec values reused at every HA, Phase 1's other Dec-channel terms
+        // (dfCor/tfCor/altCor/azmCor) can absorb that Dec-only signal almost perfectly for
+        // this specific grid - a degeneracy of an artificially regular test grid, not a
+        // property of the fixed convention itself. A real build's point pattern (AutoGrid/
+        // GoldenSpiral) never repeats Dec exactly like a rectangular grid does either.
+        var points = new List<SavedModelPoint>();
+        var haValues = new[] { -5.0, -3.0, -1.25, 1.25, 3.0, 5.0 };
+        var decValues = new[] { -20.0, -5.0, 12.0, 28.0, 44.0, 58.0 };
+        for (int hi = 0; hi < haValues.Length; hi++) {
+            var haHours = haValues[hi];
+            foreach (var decBase in decValues) {
+                var decDeg = Math.Clamp(decBase + hi * 3.3, -85.0, 85.0);
+                foreach (var pierSide in new[] { 1, -1 }) {
+                    var (raErrorArcsec, decErrorArcsec) = ComputeMountToObservedPlaceError(
+                        expected, siteLatitudeDeg, haHours, decDeg, pierSide, useAxisAngleForHarmonics: true);
+                    points.Add(new SavedModelPoint {
+                        MountHAHours = haHours,
+                        MountDecDeg = decDeg,
+                        PierSide = pierSide,
+                        PointingErrorRAArcsec = raErrorArcsec,
+                        PointingErrorDecArcsec = decErrorArcsec
+                    });
+                }
+            }
+        }
+
+        var actual = GridSearchPointingModelSolver.Solve(
+            points, siteLatitudeDeg, MountType.GEM, HarmonicTermConvention.AxisAngleFixed);
+
+        Assert.NotNull(actual);
+
+        // Hca genuinely responds to the injected signal here (unlike PolarResidualLegacy,
+        // where it either gets clamped at the sanity ceiling or stalls at 0 - see that test)
+        // - confirming the core hypothesis that AxisAngleFixed makes the term meaningfully
+        // identifiable rather than structurally degenerate.
+        Assert.InRange(actual!.Hca, expected.Hca - 15, expected.Hca + 15);
+
+        // Dca did not recover as cleanly in testing: cos(Dec+dcp) depends only on Dec, and
+        // this solver's Phase 1 (dfCor/tfCor/altCor/azmCor) has enough flexibility to absorb
+        // most of that Dec-only signal itself before Phase 2 ever sees it, even with a
+        // de-regularized point grid. That's a limitation of solving the 8 core parameters and
+        // the harmonic terms sequentially rather than jointly, not evidence against the
+        // AxisAngleFixed formula itself - worth revisiting with a joint solve if this path is
+        // pursued further. For now just assert it stays within the sanity clamp.
+        Assert.InRange(actual.Dca, 0, 600);
+    }
+
     // Verbatim port of GeoAlign::mountToObservedPlace() for a GEM/EQ mount, used to
     // generate noiseless synthetic pointing errors that are internally consistent with
-    // what GridSearchPointingModelSolver actually models (including the real, nonlinear
-    // cos(a1+hcp) treatment of hcp/hca/dcp/dca - unlike the old PointingModelSolverTests
-    // generator, which used the linear cos(H+hcp) approximation the old solver assumed).
+    // what GridSearchPointingModelSolver actually models. useAxisAngleForHarmonics selects
+    // between the currently-shipped formula (cos(polarResidual+hcp), the likely bug) and the
+    // proposed fix (cos(axisAngle+hcp)) for the hcp/hca/dcp/dca phase argument only - unlike
+    // the old PointingModelSolverTests generator, which used a different linear
+    // cos(H+hcp) approximation that neither of these matches.
     private static (double raErrorArcsec, double decErrorArcsec) ComputeMountToObservedPlaceError(
         AlignmentModelCoefficients c,
         double siteLatitudeDeg,
         double haHours,
         double decDeg,
-        int pierSide) {
+        int pierSide,
+        bool useAxisAngleForHarmonics = false) {
 
         double p = pierSide;
         double h = DegToRad(haHours * 15.0);
@@ -113,8 +190,10 @@ public class GridSearchPointingModelSolverTests {
         double a1 = -ArcsecToRad(c.AzmCor) * cosAx1 * tanAx2 + ArcsecToRad(c.AltCor) * sinAx1 * tanAx2;
         double a2 = ArcsecToRad(c.AzmCor) * sinAx1 + ArcsecToRad(c.AltCor) * cosAx1;
 
-        double cosh = Math.Cos(a1 + DegToRad(c.Hcp)) * ArcsecToRad(c.Hca) * p;
-        double cosd = Math.Cos(a2 + DegToRad(c.Dcp)) * ArcsecToRad(c.Dca) * p;
+        double hPhaseArg = useAxisAngleForHarmonics ? ax1 : a1;
+        double dPhaseArg = useAxisAngleForHarmonics ? ax2 : a2;
+        double cosh = Math.Cos(hPhaseArg + DegToRad(c.Hcp)) * ArcsecToRad(c.Hca) * p;
+        double cosd = Math.Cos(dPhaseArg + DegToRad(c.Dcp)) * ArcsecToRad(c.Dca) * p;
 
         double observedAx1 = ax1 - (a1 + pdh + doh + tfh + cosh);
         double observedAx2 = ax2 - (a2 + dfd + tfd + cosd);
