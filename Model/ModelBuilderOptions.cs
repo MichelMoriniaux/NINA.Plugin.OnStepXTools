@@ -16,5 +16,8 @@ namespace NINA.Plugin.OnStepXTools.Model {
         public bool WriteModelToMountOnCompletion { get; set; } = true;
         public bool SaveToEepromOnCompletion { get; set; } = false;
         public string? ResumeSessionId { get; set; }
+        // Which solver builds coefficients in FullSkyPointingModel mode. Defaults to the
+        // existing least-squares solver so behavior is unchanged unless explicitly opted in.
+        public PointingSolverMethod SolverMethod { get; set; } = PointingSolverMethod.LeastSquares;
     }
 }

@@ -124,8 +124,14 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             if (opts.Mode == BuildMode.FullSkyPointingModel) {
                 double siteLat = 45.0;
                 try { siteLat = _profile.ActiveProfile.AstrometrySettings.Latitude; } catch { }
-                coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
-                Logger.Info($"ModelBuilder: {goodPoints.Count} good points → solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
+
+                if (opts.SolverMethod == PointingSolverMethod.GridSearch) {
+                    var mountType = await _mount.GetMountTypeAsync(ct);
+                    coefficients = GridSearchPointingModelSolver.Solve(goodPoints, siteLat, mountType);
+                } else {
+                    coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
+                }
+                Logger.Info($"ModelBuilder: {goodPoints.Count} good points → {opts.SolverMethod} solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
 
                 if (coefficients != null && opts.WriteModelToMountOnCompletion) {
                     await _mount.WriteCoefficientsAsync(coefficients, ct);

@@ -24,6 +24,17 @@ namespace NINA.Plugin.OnStepXTools.Model {
 
     public enum PreferredPierSide { Best, West, East, Auto }
 
+    // Which algorithm PointGenerationViewModel/ModelBuilder uses to turn saved
+    // pointing-error points into AlignmentModelCoefficients for the Full-Sky mode.
+    public enum PointingSolverMethod {
+        // 12-parameter linear least-squares fit (PointingModelSolver).
+        LeastSquares,
+        // Brute-force coordinate-descent grid search matching OnStepX firmware's own
+        // GeoAlign::doSearch()/autoModel(), extended to also solve hcp/hca/dcp/dca
+        // (GridSearchPointingModelSolver).
+        GridSearch
+    }
+
     public enum ServoCalibrationCommand {
         TrackNormally,
         TrackFixedRate,
