@@ -41,6 +41,11 @@ namespace NINA.Plugin.OnStepXTools.Tests {
 
         public bool SendBool(string command) => Send(command, expectReply: true) == "1";
 
+        public void SendAck(string command) {
+            if (!SendBool(command))
+                throw new InvalidOperationException($"OnStepXSimulator rejected command {command}");
+        }
+
         private string Send(string command, bool expectReply) {
             Commands.Add(command);
             if (!command.StartsWith(":", StringComparison.Ordinal) || !command.EndsWith("#", StringComparison.Ordinal))
