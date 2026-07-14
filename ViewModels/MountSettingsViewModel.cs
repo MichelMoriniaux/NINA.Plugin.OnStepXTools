@@ -464,7 +464,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             try {
                 await Task.Run(async () => {
                     if (useOld) {
-                        return; // GXA seems to reboot the mount on versions 10.25p<v<10.26a
+                        // return; // GXA seems to reboot the mount on versions 10.25p<v<10.26a
                         await LoadAxisParamsOldFormatAsync(1, Axis1Params);
                         await LoadAxisParamsOldFormatAsync(2, Axis2Params);
                     } else {

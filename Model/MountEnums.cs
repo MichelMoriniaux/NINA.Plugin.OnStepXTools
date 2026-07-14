@@ -36,19 +36,21 @@ namespace NINA.Plugin.OnStepXTools.Model {
     }
 
     // Which formula GridSearchPointingModelSolver assumes GeoAlign::mountToObservedPlace()
-    // uses to apply hcp/hca/dcp/dca. As of the OnStepX source reviewed 2026-07, the firmware
-    // evaluates cos(a + hcp) where "a" is the tiny polar-misalignment residual term - almost
-    // certainly a bug (see the upstream report), since the forward transform
-    // (observedPlaceToMount()) instead behaves as if it were cos(axisAngle + hcp). Reported
-    // upstream; not yet fixed as of this writing.
+    // uses to apply hcp/hca/dcp/dca. Before OnStepX 10.28t, the firmware evaluated
+    // cos(a + hcp) where "a" is the tiny polar-misalignment residual term - a bug (see
+    // ONSTEPX_HARMONIC_TERM_BUG_REPORT.md), since the forward transform
+    // (observedPlaceToMount()) instead behaves as if it were cos(axisAngle + hcp). Fixed in
+    // 10.28t (see FirmwareVersion.IsAtLeast and ModelBuilder's use of it).
     public enum HarmonicTermConvention {
-        // Matches currently-shipped firmware exactly: cos(polarResidual + hcp)*hca*side.
-        // Use this for any mount running firmware without the upstream fix.
+        // Detect from the connected controller's reported firmware version (:GVN#): 10.28t or
+        // later -> AxisAngleFixed, otherwise PolarResidualLegacy. Falls back to
+        // PolarResidualLegacy if the version can't be read/parsed - safer to assume the bug is
+        // still present than to assume a fix that isn't there.
+        Auto,
+        // Matches pre-10.28t firmware exactly: cos(polarResidual + hcp)*hca*side.
         PolarResidualLegacy,
-        // Matches the proposed/corrected formula: cos(axisAngle + hcp)*hca*side, periodic in
-        // the actual mount axis position. Switch a mount to this once its firmware is
-        // confirmed to include the fix (check the reported issue for the fixed version
-        // number once one exists).
+        // Matches the corrected formula shipped in 10.28t and later: cos(axisAngle +
+        // hcp)*hca*side, periodic in the actual mount axis position.
         AxisAngleFixed
     }
 

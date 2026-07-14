@@ -20,6 +20,10 @@ namespace NINA.Plugin.OnStepXTools {
         public BuildMode DefaultBuildMode { get; set; } = BuildMode.FullSkyPointingModel;
         public bool DefaultWriteToMount { get; set; } = true;
         public bool DefaultSaveToEeprom { get; set; } = false;
+        // Which hcp/hca/dcp/dca formula GridSearchPointingModelSolver assumes - see
+        // HarmonicTermConvention. Auto detects from the connected controller's firmware
+        // version; override here to force one regardless of what's detected.
+        public HarmonicTermConvention DefaultHarmonicTermConvention { get; set; } = HarmonicTermConvention.Auto;
 
         // Last session
         public string? LastSessionId { get; set; }
