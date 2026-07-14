@@ -101,16 +101,37 @@ namespace NINA.Plugin.OnStepXTools.Tests {
         }
 
         [Fact]
-        public async Task UnverifiedPidAndServoCommandsFailClosedWithoutSending() {
+        public async Task UnverifiedPidCommandsFailClosedWithoutSending() {
             var simulator = new OnStepXSimulator();
             var mount = new OnStepXMount(simulator);
             var pid = new PidConfig { P = 1, I = 2, D = 3 };
 
             await Assert.ThrowsAsync<NotSupportedException>(() => mount.SetTrackingPidAsync(1, pid));
             await Assert.ThrowsAsync<NotSupportedException>(() => mount.SetSlewingPidAsync(1, pid));
-            await Assert.ThrowsAsync<NotSupportedException>(() => mount.ServoCalibrationAsync(ServoCalibrationCommand.RecordCalibration));
 
             Assert.Empty(simulator.Commands);
+            Assert.Empty(simulator.Faults);
+        }
+
+        [Theory]
+        [InlineData(ServoCalibrationCommand.TrackNormally,     ":SX4E,T#")]
+        [InlineData(ServoCalibrationCommand.TrackFixedRate,    ":SX4E,F#")]
+        [InlineData(ServoCalibrationCommand.RecordCalibration, ":SX4E,R#")]
+        [InlineData(ServoCalibrationCommand.StopRecording,     ":SX4E,W#")]
+        [InlineData(ServoCalibrationCommand.ClearBuffer,       ":SX4E,!#")]
+        [InlineData(ServoCalibrationCommand.LoadCalibration,   ":SX4E,L#")]
+        [InlineData(ServoCalibrationCommand.SaveCalibration,   ":SX4E,S#")]
+        [InlineData(ServoCalibrationCommand.LoadBackup,        ":SX4E,V#")]
+        [InlineData(ServoCalibrationCommand.SaveBackup,        ":SX4E,B#")]
+        [InlineData(ServoCalibrationCommand.HighPassFilter,    ":SX4E,H#")]
+        [InlineData(ServoCalibrationCommand.LowPassFilter,     ":SX4E,A#")]
+        public async Task ServoCalibrationAsync_SendsExpectedCommand(ServoCalibrationCommand cmd, string expectedCommand) {
+            var simulator = new OnStepXSimulator();
+            var mount = new OnStepXMount(simulator);
+
+            await mount.ServoCalibrationAsync(cmd);
+
+            Assert.Contains(expectedCommand, simulator.Commands);
             Assert.Empty(simulator.Faults);
         }
 
