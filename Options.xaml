@@ -1,6 +1,7 @@
 <ResourceDictionary x:Class="NINA.Plugin.OnStepXTools.Options"
                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:model="clr-namespace:NINA.Plugin.OnStepXTools.Model">
 
     <!-- Key MUST be "{AssemblyTitle}_Options" - NINA uses this to find the plugin options tab -->
     <DataTemplate x:Key="OnStepX Tools_Options">
@@ -30,6 +31,31 @@
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Write model to mount by default:" VerticalAlignment="Center"/>
                     <CheckBox  Grid.Row="3" Grid.Column="1" IsChecked="{Binding PluginOptions.DefaultWriteToMount}" Margin="0,2"/>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Grid Search Solver" Foreground="{DynamicResource PrimaryBrush}" Margin="0,8,0,0">
+                <Grid Margin="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="160"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"
+                               Text="hcp/hca/dcp/dca formula:"
+                               ToolTip="Only used by the Grid Search pointing-model solver. Auto detects this from the connected controller's firmware version (fixed in OnStepX 10.28t) - override only for testing or if detection is unreliable for your setup."/>
+                    <ComboBox  Grid.Row="0" Grid.Column="1" Margin="0,2"
+                               SelectedValue="{Binding PluginOptions.DefaultHarmonicTermConvention}" SelectedValuePath="Tag">
+                        <ComboBoxItem Tag="{x:Static model:HarmonicTermConvention.Auto}"
+                                      ToolTip="Detect from the connected controller's firmware version at build time.">Auto (recommended)</ComboBoxItem>
+                        <ComboBoxItem Tag="{x:Static model:HarmonicTermConvention.PolarResidualLegacy}"
+                                      ToolTip="Force the pre-10.28t (buggy) formula regardless of detected firmware.">Force Legacy (pre-10.28t)</ComboBoxItem>
+                        <ComboBoxItem Tag="{x:Static model:HarmonicTermConvention.AxisAngleFixed}"
+                                      ToolTip="Force the corrected formula regardless of detected firmware.">Force Fixed (10.28t+)</ComboBoxItem>
+                    </ComboBox>
                 </Grid>
             </GroupBox>
         </StackPanel>

@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.Composition;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using NINA.Core.Utility;
@@ -95,6 +96,9 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
 
         public Task<MountType> GetMountTypeAsync(CancellationToken ct = default) =>
             Task.Run(() => (MountType)(ParseInt(_cmd.SendString(OnStepXProtocol.GetMountType())) ?? 0), ct);
+
+        public Task<FirmwareVersion?> GetFirmwareVersionAsync(CancellationToken ct = default) =>
+            Task.Run(() => ParseFirmwareVersion(_cmd.SendString(OnStepXProtocol.GetFirmwareVersion())), ct);
 
         public Task RebootAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.Reboot()), ct);
@@ -278,6 +282,20 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         private static int? ParseInt(string? s) {
             if (s == null) return null;
             return int.TryParse(s, out var v) ? v : null;
+        }
+
+        // ":GVN#" replies with something like "10.28t#" (major.minor followed by an optional
+        // single patch letter) - LX200Commander.SendString already strips the trailing '#'.
+        private static readonly Regex FirmwareVersionPattern = new(@"(\d+)\.(\d+)([a-zA-Z]?)");
+
+        private static FirmwareVersion? ParseFirmwareVersion(string? s) {
+            if (s == null) return null;
+            var m = FirmwareVersionPattern.Match(s);
+            if (!m.Success) return null;
+            if (!int.TryParse(m.Groups[1].Value, out var major)) return null;
+            if (!int.TryParse(m.Groups[2].Value, out var minor)) return null;
+            var patch = m.Groups[3].Value.Length > 0 ? m.Groups[3].Value[0] : '\0';
+            return new FirmwareVersion { Major = major, Minor = minor, Patch = patch };
         }
 
         private int ReadCoefficient(int hexRegister) =>

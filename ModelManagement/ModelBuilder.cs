@@ -124,8 +124,16 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             if (opts.Mode == BuildMode.FullSkyPointingModel) {
                 double siteLat = 45.0;
                 try { siteLat = _profile.ActiveProfile.AstrometrySettings.Latitude; } catch { }
-                coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
-                Logger.Info($"ModelBuilder: {goodPoints.Count} good points → solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
+
+                if (opts.SolverMethod == PointingSolverMethod.GridSearch) {
+                    var mountType = await _mount.GetMountTypeAsync(ct);
+                    var harmonicTermConvention = await ResolveHarmonicTermConventionAsync(opts.HarmonicTermConvention, ct);
+                    coefficients = GridSearchPointingModelSolver.Solve(
+                        goodPoints, siteLat, mountType, harmonicTermConvention);
+                } else {
+                    coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
+                }
+                Logger.Info($"ModelBuilder: {goodPoints.Count} good points → {opts.SolverMethod} solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
 
                 if (coefficients != null && opts.WriteModelToMountOnCompletion) {
                     await _mount.WriteCoefficientsAsync(coefficients, ct);
@@ -156,6 +164,29 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             });
 
             return coefficients;
+        }
+
+        // Auto -> query the controller's firmware version and pick based on whether the
+        // upstream hcp/hca/dcp/dca fix (10.28t) is present. Falls back to PolarResidualLegacy
+        // if the version can't be read/parsed - safer to assume the bug is still present than
+        // to assume a fix that isn't there.
+        private async Task<HarmonicTermConvention> ResolveHarmonicTermConventionAsync(
+            HarmonicTermConvention configured, CancellationToken ct) {
+
+            if (configured != HarmonicTermConvention.Auto) return configured;
+
+            FirmwareVersion? version = null;
+            try { version = await _mount.GetFirmwareVersionAsync(ct); }
+            catch (Exception ex) { Logger.Error($"ResolveHarmonicTermConvention: failed to read firmware version: {ex.Message}"); }
+
+            var convention = version != null && version.IsAtLeast(10, 28, 't')
+                ? HarmonicTermConvention.AxisAngleFixed
+                : HarmonicTermConvention.PolarResidualLegacy;
+            var versionText = version != null
+                ? $"{version.Major}.{version.Minor}{(version.Patch == '\0' ? "" : version.Patch.ToString())}"
+                : "unknown";
+            Logger.Info($"ModelBuilder: detected firmware {versionText} → HarmonicTermConvention.{convention}.");
+            return convention;
         }
 
         private async Task ProcessPointAsync(

@@ -16,5 +16,13 @@ namespace NINA.Plugin.OnStepXTools.Model {
         public bool WriteModelToMountOnCompletion { get; set; } = true;
         public bool SaveToEepromOnCompletion { get; set; } = false;
         public string? ResumeSessionId { get; set; }
+        // Which solver builds coefficients in FullSkyPointingModel mode. Defaults to the
+        // existing least-squares solver so behavior is unchanged unless explicitly opted in.
+        public PointingSolverMethod SolverMethod { get; set; } = PointingSolverMethod.LeastSquares;
+        // Only consulted when SolverMethod == GridSearch. Defaults to Auto, which queries the
+        // connected controller's firmware version and picks PolarResidualLegacy or
+        // AxisAngleFixed accordingly - see HarmonicTermConvention and ModelBuilder. Defaults
+        // to the plugin Options pane's configured value; set this explicitly to override it.
+        public HarmonicTermConvention HarmonicTermConvention { get; set; } = _defaults.DefaultHarmonicTermConvention;
     }
 }

@@ -11,6 +11,7 @@ namespace NINA.Plugin.OnStepXTools.Interfaces {
         Task<AlignmentControllerStatus> GetAlignmentControllerStatusAsync(CancellationToken ct = default);
         Task<MountType> GetMountTypeAsync(CancellationToken ct = default);
         Task<bool> EnsureModelActivatedAsync(CancellationToken ct = default);
+        Task<FirmwareVersion?> GetFirmwareVersionAsync(CancellationToken ct = default);
 
         // --- Axis motor configuration (needs hardware verification for exact command format) ---
         Task<AxisConfig?> GetAxisConfigAsync(int axis, CancellationToken ct = default);

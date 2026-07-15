@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel.Composition;
 using System.Globalization;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -46,9 +45,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public override string ContentId => "OnStepX_MountSettings";
 
         // ── Axis config - firmware version and format detection ────────────────────
-        private int  _fwMajor;
-        private int  _fwMinor;
-        private bool _fwVersionKnown;
+        private FirmwareVersion? _firmwareVersion;
         private char _axis1DriverType;
         private char _axis2DriverType;
         private bool _axis1OldFormat;
@@ -72,17 +69,22 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public void UpdateDeviceInfo(TelescopeInfo info) {
             IsConnected = info.Connected;
             if (info.Connected && !_wasConnected) {
-                // Detect firmware version so axis config uses the right command format.
-                // ASCOM's TelescopeInfo.Description is the driver's static description, not the
-                // mount's live firmware string - query the controller directly via :GVN#.
-                try { ParseFirmwareVersion(_cmd.SendString(OnStepXProtocol.GetFirmwareVersion()) ?? string.Empty); } catch { }
-                _ = _mount.EnsureModelActivatedAsync();
-                _ = LoadAllSettingsAsync();
-                // it looks like the Ascom driver never actually uploads the Elevation to the mount,
-                // it only updates the NINA representation, so we correct that here
-                _ = SetMountLocationAsync();
+                _ = OnConnectedAsync();
             }
             _wasConnected = info.Connected;
+        }
+
+        private async Task OnConnectedAsync() {
+            // Detect firmware version so axis config uses the right command format. Must
+            // finish before LoadAllSettingsAsync (below) since it reads IsOldFormat.
+            try { _firmwareVersion = await _mount.GetFirmwareVersionAsync(); } catch { }
+            Logger.Info($"OnStepX firmware {FirmwareVersionText} - axis format: {(IsOldFormat ? "OLD" : "NEW")}");
+
+            _ = _mount.EnsureModelActivatedAsync();
+            _ = LoadAllSettingsAsync();
+            // it looks like the Ascom driver never actually uploads the Elevation to the mount,
+            // it only updates the NINA representation, so we correct that here
+            _ = SetMountLocationAsync();
         }
 
         // ── Connectivity ─────────────────────────────────────────────────────────
@@ -325,17 +327,17 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             RevertAxis1Command = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.RevertAxis(1)); StatusMessage = "Axis 1 reverted to defaults - reload to verify."; }, _ => Connected());
             RevertAxis2Command = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.RevertAxis(2)); StatusMessage = "Axis 2 reverted to defaults - reload to verify."; }, _ => Connected());
 
-            ServoTrackNormalCommand = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoTrackNormal());    StatusMessage = "Track normally."; },      _ => Connected() && IsOldFormat);
-            ServoTrackFixedCommand  = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoTrackFixed());    StatusMessage = "Track fixed rate."; },    _ => Connected() && IsOldFormat);
-            ServoRecordCommand      = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoRecord()); StatusMessage = "Recording…"; },          _ => Connected() && IsOldFormat);
-            ServoStopCommand        = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoStop()); StatusMessage = "Stopped."; },            _ => Connected() && IsOldFormat);
-            ServoClearCommand       = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoClear()); StatusMessage = "Buffer cleared."; },     _ => Connected() && IsOldFormat);
-            ServoLoadCalCommand     = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoLoadCal()); StatusMessage = "Calibration loaded."; }, _ => Connected() && IsOldFormat);
-            ServoSaveCalCommand     = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoSaveCal()); StatusMessage = "Calibration saved."; },  _ => Connected() && IsOldFormat);
-            ServoLoadBackupCommand  = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoLoadBackup()); StatusMessage = "Backup loaded."; },      _ => Connected() && IsOldFormat);
-            ServoSaveBackupCommand  = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoSaveBackup()); StatusMessage = "Backup saved."; },       _ => Connected() && IsOldFormat);
-            ServoHpfCommand         = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoHpf()); StatusMessage = "High-pass filter."; },   _ => Connected() && IsOldFormat);
-            ServoLpfCommand         = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoLpf()); StatusMessage = "Low-pass filter."; },    _ => Connected() && IsOldFormat);
+            ServoTrackNormalCommand = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoTrackNormal());    StatusMessage = "Track normally."; },      _ => Connected() && IsServoCalibrationSupported);
+            ServoTrackFixedCommand  = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoTrackFixed());    StatusMessage = "Track fixed rate."; },    _ => Connected() && IsServoCalibrationSupported);
+            ServoRecordCommand      = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoRecord()); StatusMessage = "Recording…"; },          _ => Connected() && IsServoCalibrationSupported);
+            ServoStopCommand        = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoStop()); StatusMessage = "Stopped."; },            _ => Connected() && IsServoCalibrationSupported);
+            ServoClearCommand       = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoClear()); StatusMessage = "Buffer cleared."; },     _ => Connected() && IsServoCalibrationSupported);
+            ServoLoadCalCommand     = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoLoadCal()); StatusMessage = "Calibration loaded."; }, _ => Connected() && IsServoCalibrationSupported);
+            ServoSaveCalCommand     = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoSaveCal()); StatusMessage = "Calibration saved."; },  _ => Connected() && IsServoCalibrationSupported);
+            ServoLoadBackupCommand  = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoLoadBackup()); StatusMessage = "Backup loaded."; },      _ => Connected() && IsServoCalibrationSupported);
+            ServoSaveBackupCommand  = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoSaveBackup()); StatusMessage = "Backup saved."; },       _ => Connected() && IsServoCalibrationSupported);
+            ServoHpfCommand         = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoHpf()); StatusMessage = "High-pass filter."; },   _ => Connected() && IsServoCalibrationSupported);
+            ServoLpfCommand         = new RelayCommand(_ => { _cmd.SendBlind(OnStepXProtocol.ServoLpf()); StatusMessage = "Low-pass filter."; },    _ => Connected() && IsServoCalibrationSupported);
 
             // Sky Model Management
             LoadModelFromMountCommand   = new RelayCommand(async _ => await LoadModelFromMountAsync(), _ => Connected());
@@ -457,14 +459,14 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private async Task LoadAxisConfigAsync() {
             bool useOld = IsOldFormat;
             StatusMessage = useOld
-                ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (pre-10.26 format)…"
-                : _fwVersionKnown
-                    ? $"Firmware v{_fwMajor}.{_fwMinor} - reading axis config (per-parameter format)…"
+                ? $"Firmware v{FirmwareVersionText} - reading axis config (pre-10.26a format)…"
+                : _firmwareVersion != null
+                    ? $"Firmware v{FirmwareVersionText} - reading axis config (per-parameter format)…"
                     : "Firmware version unknown - reading axis config (per-parameter format)…";
             try {
                 await Task.Run(async () => {
                     if (useOld) {
-                        return; // GXA seems to reboot the mount on versions 10.25p<v<10.26a
+                        // return; // GXA seems to reboot the mount on versions 10.25p<v<10.26a
                         await LoadAxisParamsOldFormatAsync(1, Axis1Params);
                         await LoadAxisParamsOldFormatAsync(2, Axis2Params);
                     } else {
@@ -587,19 +589,21 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }
         }
 
-        public bool IsOldFormat => _fwVersionKnown && (_fwMajor < 10 || (_fwMajor == 10 && _fwMinor < 26));
+        // Old (pre-per-parameter) axis config format applies below 10.26a - see the comment on
+        // LoadAxisConfigAsync. Unknown firmware version assumes the newer per-parameter format.
+        public bool IsOldFormat => _firmwareVersion != null && !_firmwareVersion.IsAtLeast(10, 26, 'b');
 
-        private void ParseFirmwareVersion(string description) {
-            Logger.Info($"OnStepX firmware description: {description}");
-            _fwMajor = 0; _fwMinor = 0;
-            _fwVersionKnown = false;
-            var m = Regex.Match(description, @"(\d+)\.(\d+)", RegexOptions.IgnoreCase);
-            if (!m.Success) return;
-            int.TryParse(m.Groups[1].Value, out _fwMajor);
-            int.TryParse(m.Groups[2].Value, out _fwMinor);
-            _fwVersionKnown = true;
-            Logger.Info($"OnStepX firmware v{_fwMajor}.{_fwMinor} - axis format: {(IsOldFormat ? "OLD" : "NEW")}");
-        }
+        // Servo calibration commands (:SX4E#) only exist in firmware built between 10.23a and
+        // 10.26b inclusive - see OnStepXProtocol.ServoTrackNormal()'s comment. Unknown version
+        // safely disables these commands rather than risk sending an unrecognized command.
+        public bool IsServoCalibrationSupported =>
+            _firmwareVersion != null &&
+            _firmwareVersion.IsAtLeast(10, 23, 'a') &&
+            !_firmwareVersion.IsAtLeast(10, 26, 'c');
+
+        private string FirmwareVersionText => _firmwareVersion != null
+            ? $"{_firmwareVersion.Major}.{_firmwareVersion.Minor}{(_firmwareVersion.Patch == '\0' ? "" : _firmwareVersion.Patch.ToString())}"
+            : "unknown";
 
         private static AxisParameter? ParseNewFormatParam(int index, string? response) {
             if (string.IsNullOrWhiteSpace(response)) return null;

@@ -80,6 +80,7 @@ namespace NINA.Plugin.OnStepXTools.Tests {
                 body.StartsWith("SXE9,", StringComparison.Ordinal) ||
                 body.StartsWith("SXEA,", StringComparison.Ordinal) ||
                 body.StartsWith("SXA", StringComparison.Ordinal) ||
+                body.StartsWith("SX4E,", StringComparison.Ordinal) ||
                 body.StartsWith("St", StringComparison.Ordinal) ||
                 body.StartsWith("Sg", StringComparison.Ordinal) ||
                 body.StartsWith("Sv", StringComparison.Ordinal) ||
