@@ -312,9 +312,17 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
                 // The polar-residual term (thisA1/thisA2) always contributes to the rest of
                 // the correction regardless of convention - only the cos()'s phase argument
-                // changes between the two conventions.
+                // changes between the two conventions. The shipped fix (10.28t) uses the axis
+                // angle directly for HA, but for Dec it reflects the angle on the West pier
+                // side (iax2 = pi - Dec, or -pi - Dec south of the equator) before applying
+                // the phase, since a meridian flip doesn't leave the Dec axis's actual
+                // mechanical rotation at the same raw Dec reading - see Align.hs.cpp
+                // mountToObservedPlace()/observedPlaceToMount().
+                double decPhaseArg = mAx2;
+                if (p < 0) decPhaseArg = sinLat >= 0.0 ? Math.PI - mAx2 : -Math.PI - mAx2;
+
                 a1[l] = convention == HarmonicTermConvention.AxisAngleFixed ? mAx1 : thisA1;
-                a2[l] = convention == HarmonicTermConvention.AxisAngleFixed ? mAx2 : thisA2;
+                a2[l] = convention == HarmonicTermConvention.AxisAngleFixed ? decPhaseArg : thisA2;
 
                 double doh = doCor * (1.0 / cosAx2) * p;
                 double pdh = -pdCor * tanAx2 * p;

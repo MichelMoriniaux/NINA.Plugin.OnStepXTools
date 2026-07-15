@@ -156,8 +156,9 @@ public class GridSearchPointingModelSolverTests {
     // Verbatim port of GeoAlign::mountToObservedPlace() for a GEM/EQ mount, used to
     // generate noiseless synthetic pointing errors that are internally consistent with
     // what GridSearchPointingModelSolver actually models. useAxisAngleForHarmonics selects
-    // between the currently-shipped formula (cos(polarResidual+hcp), the likely bug) and the
-    // proposed fix (cos(axisAngle+hcp)) for the hcp/hca/dcp/dca phase argument only - unlike
+    // between the pre-10.28t formula (cos(polarResidual+hcp), the bug) and the fix shipped in
+    // 10.28t (cos(axisAngle+hcp), plus the West-pier Dec reflection) for the hcp/hca/dcp/dca
+    // phase argument only - unlike
     // the old PointingModelSolverTests generator, which used a different linear
     // cos(H+hcp) approximation that neither of these matches.
     private static (double raErrorArcsec, double decErrorArcsec) ComputeMountToObservedPlaceError(
@@ -190,8 +191,14 @@ public class GridSearchPointingModelSolverTests {
         double a1 = -ArcsecToRad(c.AzmCor) * cosAx1 * tanAx2 + ArcsecToRad(c.AltCor) * sinAx1 * tanAx2;
         double a2 = ArcsecToRad(c.AzmCor) * sinAx1 + ArcsecToRad(c.AltCor) * cosAx1;
 
+        // Shipped fix (10.28t): HA uses the axis angle directly; Dec reflects it on the West
+        // pier side first (iax2 = pi - Dec, or -pi - Dec south of the equator) - see
+        // Align.hs.cpp mountToObservedPlace().
+        double iax2 = ax2;
+        if (p < 0) iax2 = sinLat >= 0.0 ? Math.PI - ax2 : -Math.PI - ax2;
+
         double hPhaseArg = useAxisAngleForHarmonics ? ax1 : a1;
-        double dPhaseArg = useAxisAngleForHarmonics ? ax2 : a2;
+        double dPhaseArg = useAxisAngleForHarmonics ? iax2 : a2;
         double cosh = Math.Cos(hPhaseArg + DegToRad(c.Hcp)) * ArcsecToRad(c.Hca) * p;
         double cosd = Math.Cos(dPhaseArg + DegToRad(c.Dcp)) * ArcsecToRad(c.Dca) * p;
 
