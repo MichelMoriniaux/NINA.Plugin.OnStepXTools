@@ -591,7 +591,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // Old (pre-per-parameter) axis config format applies below 10.26a - see the comment on
         // LoadAxisConfigAsync. Unknown firmware version assumes the newer per-parameter format.
-        public bool IsOldFormat => _firmwareVersion != null && !_firmwareVersion.IsAtLeast(10, 26, 'a');
+        public bool IsOldFormat => _firmwareVersion != null && !_firmwareVersion.IsAtLeast(10, 26, 'b');
 
         // Servo calibration commands (:SX4E#) only exist in firmware built between 10.23a and
         // 10.26b inclusive - see OnStepXProtocol.ServoTrackNormal()'s comment. Unknown version
