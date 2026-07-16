@@ -103,8 +103,8 @@
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.RefractionOnly}">Refraction only</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTracking.Full}">Full model</ComboBoxItem>
                                 </ComboBox>
-                                <Button Content="Set" Command="{Binding SetCompTrackAxisCommand}" Width="50"
-                                        ToolTip="Apply compensation axis (:T1# / :T2#)"/>
+                                <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
+                                        ToolTip="Apply compensation mode (:To# / :Tr# / :To#)"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">
@@ -115,8 +115,8 @@
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTrackingAxis.Single}">Single</ComboBoxItem>
                                     <ComboBoxItem Tag="{x:Static model:CompensatedTrackingAxis.Dual}">Dual</ComboBoxItem>
                                 </ComboBox>
-                                <Button Content="Set" Command="{Binding SetCompTrackCommand}" Width="50"
-                                        ToolTip="Apply compensation mode (:Tn# / :T1# / :T2#)"/>
+                                <Button Content="Set" Command="{Binding SetCompTrackAxisCommand}" Width="50"
+                                        ToolTip="Apply compensation mode (:T1# / :T2#)"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4">

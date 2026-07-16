@@ -248,11 +248,11 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }, _ => Connected());
 
             SetCompTrackCommand = new RelayCommand(_ => {
-                _cmd.SendBlind(OnStepXProtocol.CompensatedTracking(CompensatedTracking));
+                _cmd.SendAck(OnStepXProtocol.CompensatedTracking(CompensatedTracking));
             }, _ => Connected());
 
             SetCompTrackAxisCommand = new RelayCommand(_ => {
-                _cmd.SendBlind(OnStepXProtocol.CompensatedTrackingAxis(CompensatedTrackingAxis));
+                _cmd.SendAck(OnStepXProtocol.CompensatedTrackingAxis(CompensatedTrackingAxis));
             }, _ => Connected());
 
             FreqPlusCommand  = new RelayCommand(_ => _cmd.SendBlind(OnStepXProtocol.TrackingFrequencyAdjust(+1)), _ => Connected());
