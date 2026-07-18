@@ -9,6 +9,7 @@
         <conv:BoolToVisibilityConverter  x:Key="InvBoolToVis" Invert="True"/>
         <conv:BoolStringConverter        x:Key="BoolStringConverter"/>
         <conv:ZeroToVisibilityConverter  x:Key="ZeroToVis"/>
+        <conv:DecayModeStringConverter   x:Key="DecayModeStringConverter"/>
         <Style TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="ContentTemplate">
                 <Setter.Value>
@@ -515,11 +516,17 @@
                                                       Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
                                                       VerticalAlignment="Center" Margin="4,0"
                                                       IsChecked="{Binding EditValue, Converter={StaticResource BoolStringConverter}}"/>
+                                            <ComboBox Grid.Column="1"
+                                                      Visibility="{Binding IsDecay, Converter={StaticResource BoolToVis}}"
+                                                      Margin="4,0"
+                                                      IsSynchronizedWithCurrentItem="False"
+                                                      ItemsSource="{x:Static model:AxisParameter.DecayModeLabels}"
+                                                      SelectedItem="{Binding EditValue, Converter={StaticResource DecayModeStringConverter}}"/>
                                             <TextBox Grid.Column="1"
-                                                     Visibility="{Binding IsBoolean, Converter={StaticResource InvBoolToVis}}"
+                                                     Visibility="{Binding IsPlainText, Converter={StaticResource BoolToVis}}"
                                                      Text="{Binding EditValue, UpdateSourceTrigger=PropertyChanged}"
                                                      FontFamily="Courier New" Margin="4,0"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding CurrentValue, StringFormat='now: {0}'}"
+                                            <TextBlock Grid.Column="2" Text="{Binding CurrentValueDisplay, StringFormat='now: {0}'}"
                                                        VerticalAlignment="Center" FontSize="10" Margin="4,0"/>
                                         </Grid>
                                     </DataTemplate>
@@ -566,11 +573,17 @@
                                                       Visibility="{Binding IsBoolean, Converter={StaticResource BoolToVis}}"
                                                       VerticalAlignment="Center" Margin="4,0"
                                                       IsChecked="{Binding EditValue, Converter={StaticResource BoolStringConverter}}"/>
+                                            <ComboBox Grid.Column="1"
+                                                      Visibility="{Binding IsDecay, Converter={StaticResource BoolToVis}}"
+                                                      Margin="4,0"
+                                                      IsSynchronizedWithCurrentItem="False"
+                                                      ItemsSource="{x:Static model:AxisParameter.DecayModeLabels}"
+                                                      SelectedItem="{Binding EditValue, Converter={StaticResource DecayModeStringConverter}}"/>
                                             <TextBox Grid.Column="1"
-                                                     Visibility="{Binding IsBoolean, Converter={StaticResource InvBoolToVis}}"
+                                                     Visibility="{Binding IsPlainText, Converter={StaticResource BoolToVis}}"
                                                      Text="{Binding EditValue, UpdateSourceTrigger=PropertyChanged}"
                                                      FontFamily="Courier New" Margin="4,0"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding CurrentValue, StringFormat='now: {0}'}"
+                                            <TextBlock Grid.Column="2" Text="{Binding CurrentValueDisplay, StringFormat='now: {0}'}"
                                                        VerticalAlignment="Center" FontSize="10" Margin="4,0"/>
                                         </Grid>
                                     </DataTemplate>

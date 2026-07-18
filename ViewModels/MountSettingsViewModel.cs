@@ -546,15 +546,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private Task LoadAxisParamsNewFormatAsync(int axis, ObservableCollection<AxisParameter> collection) {
             return Task.Run(() => {
-                var rawCount = _telescope.SendCommandString(OnStepXProtocol.GetAxisParamsCount(axis), raw: true);
-                Logger.Debug($"OnStepX :GXA{axis},0# raw: '{rawCount}'");
-                if (string.IsNullOrWhiteSpace(rawCount)) return;
-                var countStr = rawCount.TrimEnd('#').Trim();
-                if (!int.TryParse(countStr, out var count) || count <= 0) return;
+                var count = _cmd.GetInt(OnStepXProtocol.GetAxisParamsCount(axis));
+                Logger.Debug($"OnStepX :GXA{axis},0# raw: '{count}'");
 
                 var loaded = new List<AxisParameter>();
                 for (int i = 1; i <= count; i++) {
                     var r = _cmd.SendString(OnStepXProtocol.GetAxisParameter(axis, i));
+                    Logger.Debug($"OnStepX :GXA{axis},{i}# raw: '{r}'");
                     var p = ParseNewFormatParam(i, r);
                     if (p != null) loaded.Add(p);
                 }
@@ -605,12 +603,53 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             ? $"{_firmwareVersion.Major}.{_firmwareVersion.Minor}{(_firmwareVersion.Patch == '\0' ? "" : _firmwareVersion.Patch.ToString())}"
             : "unknown";
 
+        // OnStepX's axis-parameter name label table (Extended.Constants.h L_AXPN_*). The
+        // firmware sends "$N" instead of the full label to save bandwidth; index N (1-based)
+        // into this array to recover it.
+        private static readonly string[] AxisParamLabels = {
+            "Steps/degree",                       // $1  (first axis parameter)
+            "Min limit, degs",                     // $2
+            "Max limit, degs",                     // $3
+            "Steps/um",                            // $4
+            "Min limit, um",                       // $5
+            "Max limit, um",                       // $6
+            "Reverse",                             // $7  (first motor parameter)
+            "Microsteps",                          // $8
+            "Microsteps Goto",                     // $9
+            "Decay mode",                          // $10
+            "Decay mode Goto",                     // $11
+            "mA Hold",                              // $12
+            "mA Run",                               // $13
+            "mA Goto",                              // $14
+            "256x Interpolate",                    // $15
+            "P Tracking",  // $16
+            "I Tracking",  // $17
+            "D Tracking",  // $18
+            "P Slewing",   // $19
+            "I Slewing",   // $20
+            "D Slewing",   // $21
+            "Rads/count",                          // $22
+            "Steps/count ratio",                   // $23
+            "Max accel, %/s/s",                    // $24
+            "Min power, %",                        // $25
+            "Max power, %"                         // $26
+        };
+
+        // Resolves a "$N" axis-parameter-name placeholder to its label; any other string
+        // (including one that just happens not to start with '$') is returned unchanged.
+        private static string ResolveParamName(string raw) {
+            if (!raw.StartsWith('$')) return raw;
+            if (int.TryParse(raw.AsSpan(1), out var n) && n >= 1 && n <= AxisParamLabels.Length)
+                return AxisParamLabels[n - 1];
+            return raw;
+        }
+
         private static AxisParameter? ParseNewFormatParam(int index, string? response) {
             if (string.IsNullOrWhiteSpace(response)) return null;
             var parts = response.Split(',', 5);
             if (parts.Length < 4) return null;
             int.TryParse(parts[3].Trim(), out var typeCode);
-            var name = parts.Length >= 5 ? parts[4].Trim() : $"Parameter {index}";
+            var name = parts.Length >= 5 ? ResolveParamName(parts[4].Trim()) : $"Parameter {index}";
             var value = parts[0].Trim();
             return new AxisParameter { Index = index, Name = name, CurrentValue = value,
                 Min = parts.Length > 1 ? parts[1].Trim() : "", Max = parts.Length > 2 ? parts[2].Trim() : "",
