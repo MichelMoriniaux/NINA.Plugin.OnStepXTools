@@ -58,6 +58,9 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         public static string GetAxisParameter(int axis, int index) => $":GXA{axis.ToString()},{index.ToString()}#";
         public static string SetAxisParameter(int axis, int index, string value) => $":SXA{axis.ToString()},{index.ToString()},{value}#";
 
+        // :SXAC,0# = use runtime NV axis settings, :SXAC,1# = use compile-time Config.h axis settings
+        public static string SetRuntimeAxisConfig(bool enabled) => enabled ? ":SXAC,0#" : ":SXAC,1#";
+
         public static string SetHomePosition() => ":hF#";
         public static string SetParkPosition() => ":hQ#";
         public static string SetEncoderOrigin() => ":SEO#";

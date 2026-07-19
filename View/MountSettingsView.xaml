@@ -489,8 +489,30 @@
                         </StackPanel>
                     </GroupBox>
 
+                    <!-- Runtime configuration of axis -->
+                    <GroupBox Header="Runtime configuration of axis" Margin="0,0,0,4">
+                        <StackPanel>
+                            <StackPanel Margin="6,4">
+                                <CheckBox Content="Runtime configuration of axis"
+                                        ToolTip="toggle runtime configuration of axis"
+                                        IsChecked="{Binding RuntimeAxisConfigEnabled}"/>
+                                <StackPanel>
+                                    <TextBlock Text="Disabled: Use Config.h values. NOTE: Disabling will revert all values to defaults on next reboot" FontSize="10" Margin="0,4,0,0"/>
+                                    <TextBlock Text="Enabled: Allow runtime modification of motor parameters" FontSize="10"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel>
+                                    <TextBlock Text="Notes:" FontSize="10" Margin="0,4,0,0"/>
+                                    <TextBlock Text="- Most axis setting changes require a reboot to take effect unless stated." FontSize="10" Margin="0,4,0,0"/>
+                                    <TextBlock Text="- After pressing [Save Axis n] take note of changes since the upload may have been rejected due to an invalid parameter." FontSize="10" Margin="0,4,0,0"/>
+                                    <TextBlock Text="- When you choose to [Revert Defaults] that group becomes unavailable for editing until you reboot OnStep." FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
                     <!-- Axis 1 -->
-                    <GroupBox Margin="0,0,0,4">
+                    <GroupBox Margin="0,0,0,4"
+                              Visibility="{Binding RuntimeAxisConfigEnabled, Converter={StaticResource BoolToVis}}">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Axis 1 — RA / Az   " FontWeight="Bold"/>
@@ -547,7 +569,8 @@
                     </GroupBox>
 
                     <!-- Axis 2 -->
-                    <GroupBox Margin="0,0,0,4">
+                    <GroupBox Margin="0,0,0,4"
+                              Visibility="{Binding RuntimeAxisConfigEnabled, Converter={StaticResource BoolToVis}}">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Axis 2 — Dec / Alt   " FontWeight="Bold"/>

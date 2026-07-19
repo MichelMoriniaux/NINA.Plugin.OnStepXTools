@@ -97,10 +97,34 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private MountType _mountType    = MountType.GEM;
         private string _axis1DriverId  = string.Empty;
         private string _axis2DriverId  = string.Empty;
+        private bool _runtimeAxisConfigEnabled;
 
         public MountType MountType     { get => _mountType;     set => SetProperty(ref _mountType,     value); }
         public string    Axis1DriverId { get => _axis1DriverId; private set => SetProperty(ref _axis1DriverId, value); }
         public string    Axis2DriverId { get => _axis2DriverId; private set => SetProperty(ref _axis2DriverId, value); }
+
+        // Whether motor/axis parameters can be changed at runtime (:SXAC,0#) or are fixed at
+        // their Config.h compile-time values (:SXAC,1#). The setter sends the command - it's
+        // only meant to be driven by the UI checkbox. Loading/syncing state read back from the
+        // mount must go through SetRuntimeAxisConfigFromMount instead, or every settings
+        // refresh would silently re-send :SXAC# to the controller.
+        public bool RuntimeAxisConfigEnabled {
+            get => _runtimeAxisConfigEnabled;
+            set {
+                if (!SetProperty(ref _runtimeAxisConfigEnabled, value)) return;
+                _cmd.SendBlind(OnStepXProtocol.SetRuntimeAxisConfig(value));
+                StatusMessage = value
+                    ? "Runtime axis configuration enabled."
+                    : "Runtime axis configuration disabled - using Config.h values.";
+            }
+        }
+
+        // Reflects state read back from the mount (e.g. on load) without re-sending :SXAC#.
+        private void SetRuntimeAxisConfigFromMount(bool enabled) {
+            if (_runtimeAxisConfigEnabled == enabled) return;
+            _runtimeAxisConfigEnabled = enabled;
+            RaisePropertyChanged(nameof(RuntimeAxisConfigEnabled));
+        }
 
         public ObservableCollection<AxisParameter> Axis1Params { get; } = new();
         public ObservableCollection<AxisParameter> Axis2Params { get; } = new();
@@ -479,6 +503,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 });
 
                 int total = Axis1Params.Count + Axis2Params.Count;
+                SetRuntimeAxisConfigFromMount(total > 0);
                 StatusMessage = total > 0
                     ? $"Axis 1: {Axis1Params.Count} params, Axis 2: {Axis2Params.Count} params loaded."
                     : "Firmware reports 0 runtime-configurable axis parameters (compile-time motor constants).";
