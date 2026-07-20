@@ -92,7 +92,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
         // end useless commands
 
         public Task SetMountTypeAsync(MountType type, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetMountType(type)), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.SetMountType(type)), ct);
 
         public Task<MountType> GetMountTypeAsync(CancellationToken ct = default) =>
             Task.Run(() => (MountType)(ParseInt(_cmd.SendString(OnStepXProtocol.GetMountType())) ?? 0), ct);
@@ -120,7 +120,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
                     ServoCalibrationCommand.LowPassFilter       => OnStepXProtocol.ServoLpf(),
                     _ => null
                 };
-                if (lx != null) _cmd.SendBlind(lx);
+                if (lx != null) _cmd.SendAck(lx);
             }, ct);
         // ── Settings ─────────────────────────────────────────────────────────────
 
@@ -135,16 +135,16 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             }, ct);
 
         public Task SetTrackingAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.Tracking(enabled)), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.Tracking(enabled)), ct);
 
         public Task SetTrackingRateAsync(TrackingRate rate, CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.TrackingRate(rate)), ct);
 
         public Task SetCompensatedTrackingAsync(CompensatedTracking mode, bool dualAxis, CancellationToken ct = default) =>
             Task.Run(() => {
-                _cmd.SendBlind(OnStepXProtocol.CompensatedTracking(mode));
+                _cmd.SendAck(OnStepXProtocol.CompensatedTracking(mode));
                 if (mode != CompensatedTracking.Off)
-                    _cmd.SendBlind(OnStepXProtocol.CompensatedTrackingAxis(
+                    _cmd.SendAck(OnStepXProtocol.CompensatedTrackingAxis(
                         dualAxis ? CompensatedTrackingAxis.Dual : CompensatedTrackingAxis.Single));
             }, ct);
 
@@ -158,7 +158,7 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetHomePosition()), ct);
 
         public Task SetParkPositionAsync(CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SetParkPosition()), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.SetParkPosition()), ct);
 
         public Task SetGuideRateAsync(int rateIndex, CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.GuideRatePreset(rateIndex)), ct);
@@ -167,32 +167,32 @@ namespace NINA.Plugin.OnStepXTools.Equipment {
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.SlewSpeedPreset(speed)), ct);
 
         public Task SetGotoBuzzerAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.GotoBuzzer(enabled)), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.GotoBuzzer(enabled)), ct);
 
         public Task SetAutoMeridianFlipAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.AutoMeridianFlip(enabled)), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.AutoMeridianFlip(enabled)), ct);
 
         public Task TriggerMeridianFlipAsync(CancellationToken ct = default) =>
             Task.Run(() => _cmd.SendBlind(OnStepXProtocol.MeridianFlipNow()), ct);
 
         public Task SetPauseAtHomeAsync(bool enabled, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.PauseAtHome(enabled)), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.PauseAtHome(enabled)), ct);
 
         public Task SetPreferredPierSideAsync(PreferredPierSide side, CancellationToken ct = default) =>
-            Task.Run(() => _cmd.SendBlind(OnStepXProtocol.PreferredPierSide(side)), ct);
+            Task.Run(() => _cmd.SendAck(OnStepXProtocol.PreferredPierSide(side)), ct);
 
         public Task SetBacklashAsync(int axis1, int axis2, CancellationToken ct = default) =>
             Task.Run(() => {
-                _cmd.SendBlind(OnStepXProtocol.BacklashRa(axis1));
-                _cmd.SendBlind(OnStepXProtocol.BacklashDec(axis2));
+                _cmd.SendAck(OnStepXProtocol.BacklashRa(axis1));
+                _cmd.SendAck(OnStepXProtocol.BacklashDec(axis2));
             }, ct);
 
         public Task SetLimitsAsync(double minAlt, double maxAlt, double east, double west, CancellationToken ct = default) =>
             Task.Run(() => {
-                _cmd.SendBlind(OnStepXProtocol.HorizonLimit(minAlt));
-                _cmd.SendBlind(OnStepXProtocol.OverheadLimit(maxAlt));
-                _cmd.SendBlind(OnStepXProtocol.MeridianLimitEast(east));
-                _cmd.SendBlind(OnStepXProtocol.MeridianLimitWest(west));
+                _cmd.SendAck(OnStepXProtocol.HorizonLimit(minAlt));
+                _cmd.SendAck(OnStepXProtocol.OverheadLimit(maxAlt));
+                _cmd.SendAck(OnStepXProtocol.MeridianLimitEast(east));
+                _cmd.SendAck(OnStepXProtocol.MeridianLimitWest(west));
             }, ct);
 
         // ── Alignment ────────────────────────────────────────────────────────────

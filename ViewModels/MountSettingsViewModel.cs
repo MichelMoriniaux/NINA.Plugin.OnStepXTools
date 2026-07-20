@@ -596,12 +596,12 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                     foreach (var p in collection) values.Add(p.EditValue);
                     if (values.Count > 0 && dtype != '\0') values[^1] += dtype;
                     var cmd = OnStepXProtocol.SetAxisParamsOldFormat(axis, string.Join(",", values));
-                    try { var ok = _telescope.SendCommandBool(cmd, raw: true); if (ok) saved = values.Count; else failed = 1; } catch { failed = 1; }
+                    try { var ok = _cmd.SendBool(cmd); if (ok) saved = values.Count; else failed = 1; } catch { failed = 1; }
                 } else {
                     foreach (var param in collection) {
                         if (param.EditValue == param.CurrentValue) continue;
                         var cmd = OnStepXProtocol.SetAxisParameter(axis, param.Index, param.EditValue);
-                        try { var ok = _telescope.SendCommandBool(cmd, raw: true); if (ok) saved++; else failed++; } catch { failed++; }
+                        try { var ok = _cmd.SendBool(cmd); if (ok) saved++; else failed++; } catch { failed++; }
                     }
                 }
             });
