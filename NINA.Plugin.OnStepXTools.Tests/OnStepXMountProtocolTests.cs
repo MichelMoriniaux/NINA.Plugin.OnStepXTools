@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -101,15 +102,69 @@ namespace NINA.Plugin.OnStepXTools.Tests {
         }
 
         [Fact]
-        public async Task UnverifiedPidCommandsFailClosedWithoutSending() {
+        public async Task NewSettingsCommands_SendExpectedProtocolStrings() {
             var simulator = new OnStepXSimulator();
             var mount = new OnStepXMount(simulator);
-            var pid = new PidConfig { P = 1, I = 2, D = 3 };
 
-            await Assert.ThrowsAsync<NotSupportedException>(() => mount.SetTrackingPidAsync(1, pid));
-            await Assert.ThrowsAsync<NotSupportedException>(() => mount.SetSlewingPidAsync(1, pid));
+            await mount.RevertAxisAsync(1);
+            await mount.ClearEepromAsync();
+            await mount.ContinueGotoAfterPauseAsync();
+            await mount.SetEncoderOriginAsync();
+            await mount.SetCompensatedTrackingAxisAsync(CompensatedTrackingAxis.Dual);
+            await mount.SetRuntimeAxisConfigAsync(true);
 
-            Assert.Empty(simulator.Commands);
+            Assert.Contains(":SXA1,R#", simulator.Commands);
+            Assert.Contains(":ENVRESET#", simulator.Commands);
+            Assert.Contains(":SX99,1#", simulator.Commands);
+            Assert.Contains(":SEO#", simulator.Commands);
+            Assert.Contains(":T2#", simulator.Commands);
+            Assert.Contains(":SXAC,0#", simulator.Commands);
+            Assert.Empty(simulator.Faults);
+        }
+
+        [Fact]
+        public async Task ReloadSettingsAsync_PopulatesStateFromMount() {
+            var simulator = new OnStepXSimulator { MountType = MountType.GEM };
+            var mount = new OnStepXMount(simulator);
+
+            await mount.ReloadSettingsAsync();
+
+            Assert.True(mount.State.TrackingEnabled);
+            Assert.Equal(5, mount.State.GuideRateIndex);
+            Assert.Equal("X", mount.State.LastError);
+            Assert.Equal(MountType.GEM, mount.State.MountType);
+            Assert.Equal(PreferredPierSide.Best, mount.State.PreferredPierSide);
+            Assert.Equal(12, mount.State.BacklashAxis1Arcsec);
+            Assert.Equal(13, mount.State.BacklashAxis2Arcsec);
+            Assert.Equal(-5, mount.State.LimitMinAltDeg);
+            Assert.Equal(85, mount.State.LimitMaxAltDeg);
+            Assert.Equal(7.5, mount.State.LimitEastPastMeridian);
+            Assert.Equal(-2.5, mount.State.LimitWestPastMeridian);
+            Assert.Equal("+37*30:00", mount.State.LatitudeDMS);
+            Assert.Equal("-122*15:00", mount.State.LongitudeDMS);
+            Assert.Equal("15.2", mount.State.Elevation);
+            Assert.Empty(mount.State.Axis1Params);
+            Assert.Empty(mount.State.Axis2Params);
+            Assert.Empty(simulator.Faults);
+        }
+
+        [Fact]
+        public async Task SaveAxisAsync_PushesEditedParamsThenReloadsThatAxis() {
+            var simulator = new OnStepXSimulator();
+            simulator.AxisParams[1] = new Dictionary<int, string> {
+                [1] = "5,0,10,4,$1"
+            };
+            var mount = new OnStepXMount(simulator);
+
+            await mount.ReloadSettingsAsync();
+            Assert.Single(mount.State.Axis1Params);
+            Assert.Equal("Steps/degree", mount.State.Axis1Params[0].Name);
+            Assert.Equal("5", mount.State.Axis1Params[0].CurrentValue);
+
+            mount.State.Axis1Params[0].EditValue = "7";
+            await mount.SaveAxisAsync(1);
+
+            Assert.Contains(":SXA1,1,7#", simulator.Commands);
             Assert.Empty(simulator.Faults);
         }
 

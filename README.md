@@ -353,6 +353,32 @@ Key implementation notes:
 
 ---
 
+## Refresh Cadence
+
+All OnStepX-specific state (everything above except standard ASCOM telemetry) is owned by a single `OnStepXMount` object and cached in `OnStepXMountState`, refreshed at different rates depending on how often the value actually needs to change. Settings that are also edit targets (the ones you change in Mount Settings and click a "Set" button for) only ever refresh on connect or a manual reload — never on a timer — so a background refresh can never overwrite an edit you haven't submitted yet.
+
+| Setting / state | Command(s) | Refresh cadence |
+|---|---|---|
+| Firmware version, axis-format detection, servo-calibration support | `:GVN#` | Once, on connect only |
+| Mount type | `:GXEM#` | Connect + manual reload (Load button); updated immediately after you change it |
+| Tracking on/off, tracking rate, rate compensation (+axis), guide rate, auto meridian flip, pause at home, buzzer | `:GU#` (packed status) | Connect + manual reload; each updated immediately after you change it |
+| Preferred pier side | `:GX96#` | Connect + manual reload; updated immediately after you change it |
+| Backlash (axis 1 / axis 2) | `:$BR#` / `:$BD#` | Connect + manual reload; updated immediately after you change it |
+| Altitude limits (min / max) | `:Gh#` / `:Go#` | Connect + manual reload; updated immediately after you change it |
+| Meridian limits (east / west) | `:GXE9#` / `:GXEA#` | Connect + manual reload; updated immediately after you change it |
+| Site latitude / longitude / elevation | `:GtH#` / `:GgH#` / `:Gv#` | Connect + manual reload |
+| Axis driver ID | `:GXA{n},M#` | Connect + manual reload |
+| Axis motor parameters | `:GXA{n},0#` (count) + `:GXA{n},{i}#` per parameter | Connect + manual reload; saving an axis re-reads just that axis afterward |
+| Runtime axis config enabled | derived (parameter count > 0) | Connect + manual reload; updated immediately after you toggle it |
+| Weather (temperature, pressure, humidity, dew point, controller temperature) | `:GX9A/B/C/E/F#` | Periodic, ~30 s — timed off N.I.N.A.'s own telescope poll rather than an independent timer |
+| Last error code | `:GU#` (last character) | Periodic, ~30 s; also refreshed on connect/manual reload |
+| Alignment coefficients, star count, controller status | `:GX0n#` / `:SX0n,v#`, `:GX09#`, `:A?#` | On demand only — Sky Model Management "Load/Write Model" buttons, never cached |
+| RA/Dec, Alt/Az, slewing, at-park, at-home, epoch, etc. | Standard ASCOM `ITelescope` properties | Every N.I.N.A. telescope poll (default every 2 s, `DevicePollingInterval` in Options) |
+
+All transport access is serialized through a single gate inside `OnStepXMount`, so the periodic weather refresh and any Set/Get command you trigger from the UI never collide on the wire.
+
+---
+
 ## Session Persistence
 
 Build sessions are written atomically (write to `.tmp`, rename) after every successfully solved point:

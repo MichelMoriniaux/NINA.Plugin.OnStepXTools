@@ -76,6 +76,29 @@ namespace NINA.Plugin.OnStepXTools.Tests {
             if (body.StartsWith("SX0", StringComparison.Ordinal))
                 return WriteSx0(body);
 
+            // ── Settings readback (ReloadSettingsAsync) ─────────────────────────
+            if (body == "GU") return GuStatus;
+            if (body == "GX96") return PreferredPierSideChar;
+            if (body == "$BR") return BacklashRa.ToString(CultureInfo.InvariantCulture);
+            if (body == "$BD") return BacklashDec.ToString(CultureInfo.InvariantCulture);
+            if (body == "Gh") return HorizonLimitDeg.ToString(CultureInfo.InvariantCulture);
+            if (body == "Go") return OverheadLimitDeg.ToString(CultureInfo.InvariantCulture);
+            if (body == "GXE9") return MeridianLimitEastMinutes.ToString(CultureInfo.InvariantCulture);
+            if (body == "GXEA") return MeridianLimitWestMinutes.ToString(CultureInfo.InvariantCulture);
+            if (body == "GtH") return Latitude;
+            if (body == "GgH") return Longitude;
+            if (body == "Gv") return Elevation;
+
+            // ── Axis parameter readback ──────────────────────────────────────────
+            if (body.StartsWith("GXA", StringComparison.Ordinal)) {
+                var parts = body[3..].Split(',');
+                var axis = int.Parse(parts[0], CultureInfo.InvariantCulture);
+                if (parts.Length == 1) return ""; // old-format raw dump - unused by current tests
+                if (parts[1] == "0") return AxisParamCount(axis).ToString(CultureInfo.InvariantCulture);
+                if (parts[1] == "M") return $"Driver{axis}";
+                return AxisParamResponse(axis, int.Parse(parts[1], CultureInfo.InvariantCulture));
+            }
+
             if (body.StartsWith("SX9", StringComparison.Ordinal) ||
                 body.StartsWith("SXE9,", StringComparison.Ordinal) ||
                 body.StartsWith("SXEA,", StringComparison.Ordinal) ||
@@ -88,12 +111,36 @@ namespace NINA.Plugin.OnStepXTools.Tests {
                 body.StartsWith("$B", StringComparison.Ordinal) ||
                 body.StartsWith("Sh", StringComparison.Ordinal) ||
                 body.StartsWith("So", StringComparison.Ordinal) ||
-                body is "Te" or "Td" or "TQ" or "TL" or "TS" or "TK" or "To" or "Tr" or "Tn" or "T1" or "T2" or "T+" or "T-" or "TR" or "ERESET") {
+                body is "Te" or "Td" or "TQ" or "TL" or "TS" or "TK" or "To" or "Tr" or "Tn" or "T1" or "T2" or "T+" or "T-" or "TR" or "ERESET" or "ENVRESET" or "SEO") {
                 return "1";
             }
 
             return Unknown(body);
         }
+
+        // ── Canned settings readback used by ReloadSettingsAsync tests ─────────────
+        // GU# packed status: tracking enabled ('n' absent), guide rate index 5 (2nd-to-last
+        // char), last char is the error code consumed as LastError.
+        public string GuStatus { get; set; } = "5X";
+        public string PreferredPierSideChar { get; set; } = "B";
+        public int BacklashRa { get; set; } = 12;
+        public int BacklashDec { get; set; } = 13;
+        public int HorizonLimitDeg { get; set; } = -5;
+        public int OverheadLimitDeg { get; set; } = 85;
+        public int MeridianLimitEastMinutes { get; set; } = 30;
+        public int MeridianLimitWestMinutes { get; set; } = -10;
+        public string Latitude { get; set; } = "+37*30:00";
+        public string Longitude { get; set; } = "-122*15:00";
+        public string Elevation { get; set; } = "15.2";
+
+        // axis -> (index -> "value,min,max,typeCode,name")
+        public Dictionary<int, Dictionary<int, string>> AxisParams { get; } = new();
+
+        private int AxisParamCount(int axis) =>
+            AxisParams.TryGetValue(axis, out var p) ? p.Count : 0;
+
+        private string AxisParamResponse(int axis, int index) =>
+            AxisParams.TryGetValue(axis, out var p) && p.TryGetValue(index, out var r) ? r : Unknown($"GXA{axis},{index}");
 
         private string ReadGx0(char reg) => reg switch {
             '0' => _model["ax1"].ToString(CultureInfo.InvariantCulture),
