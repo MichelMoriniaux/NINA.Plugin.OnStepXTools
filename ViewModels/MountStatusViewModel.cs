@@ -1,13 +1,10 @@
 using System;
 using System.ComponentModel.Composition;
 using System.Globalization;
-using System.Threading;
-using System.Threading.Tasks;
-using NINA.Core.Utility;
 using NINA.Equipment.Equipment.MyTelescope;
 using NINA.Equipment.Interfaces.Mediator;
 using NINA.Equipment.Interfaces.ViewModel;
-using NINA.Plugin.OnStepXTools.Equipment;
+using NINA.Plugin.OnStepXTools.Interfaces;
 using NINA.Profile.Interfaces;
 using NINA.WPF.Base.ViewModel;
 
@@ -17,21 +14,23 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
     [PartCreationPolicy(CreationPolicy.Shared)]
     public class MountStatusViewModel : DockableVM, ITelescopeConsumer, IDisposable {
         private readonly ITelescopeMediator _telescope;
-        private CancellationTokenSource?    _weatherCts;
-        private readonly LX200Commander     _cmd;
+        private readonly IOnStepXMount      _mount;
 
         public override string ContentId => "OnStepX_MountStatus";
 
         [ImportingConstructor]
-        public MountStatusViewModel(ITelescopeMediator telescope, IProfileService profile)
+        public MountStatusViewModel(ITelescopeMediator telescope, IProfileService profile, IOnStepXMount mount)
             : base(profile) {
             Title         = "OnStepX Mount Status";
             ImageGeometry = System.Windows.Application.Current?.Resources["TelescopeSVG"] as System.Windows.Media.GeometryGroup;
             _telescope    = telescope;
+            _mount        = mount;
             _telescope.RegisterConsumer(this);
-            _cmd          = new LX200Commander(telescope);
-            StartWeatherPolling();
+            _mount.State.PropertyChanged += OnMountStateChanged;
         }
+
+        private void OnMountStateChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+            Dispatch(() => RaisePropertyChanged(e.PropertyName));
 
         // ── Connection ───────────────────────────────────────────────────────────
 
@@ -109,21 +108,14 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public string SiteLongitude { get => _siteLongitude; private set => SetProperty(ref _siteLongitude, value); }
         public string SiteElevation { get => _siteElevation; private set => SetProperty(ref _siteElevation, value); }
 
-        // ── Weather (OnStepX LX200 polling) ─────────────────────────────────────
+        // ── Weather (OnStepX LX200 polling, refreshed by OnStepXMount's periodic tier) ──
 
-        private double _ambientTemp;
-        private double _pressure;
-        private double _humidity;
-        private double _dewPoint;
-        private double _controllerTemp;
-        private string _lastError = string.Empty;
-
-        public double AmbientTemperatureCelsius    { get => _ambientTemp;     private set => SetProperty(ref _ambientTemp,     value); }
-        public double BarometricPressureMb         { get => _pressure;        private set => SetProperty(ref _pressure,        value); }
-        public double RelativeHumidityPercent      { get => _humidity;        private set => SetProperty(ref _humidity,        value); }
-        public double DewPointCelsius              { get => _dewPoint;        private set => SetProperty(ref _dewPoint,        value); }
-        public double ControllerTemperatureCelsius { get => _controllerTemp;  private set => SetProperty(ref _controllerTemp,  value); }
-        public string LastError                    { get => _lastError;        private set => SetProperty(ref _lastError,       value); }
+        public double AmbientTemperatureCelsius    => _mount.State.AmbientTemperatureCelsius;
+        public double BarometricPressureMb         => _mount.State.BarometricPressureMb;
+        public double RelativeHumidityPercent      => _mount.State.RelativeHumidityPercent;
+        public double DewPointCelsius              => _mount.State.DewPointCelsius;
+        public double ControllerTemperatureCelsius => _mount.State.ControllerTemperatureCelsius;
+        public string LastError                    => _mount.State.LastError;
 
         // ── ITelescopeConsumer ───────────────────────────────────────────────────
 
@@ -161,49 +153,10 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             try { SiteElevation = $"{info.SiteElevation:F0} m"; } catch { }
         }
 
-        // ── Weather polling (OnStepX LX200 commands) ─────────────────────────────
-
-        private void StartWeatherPolling() {
-            _weatherCts = new CancellationTokenSource();
-            _ = Task.Run(() => WeatherLoopAsync(_weatherCts.Token));
-        }
-
-        private async Task WeatherLoopAsync(CancellationToken ct) {
-            await Task.Delay(5000, ct).ContinueWith(_ => { }, CancellationToken.None);
-            while (!ct.IsCancellationRequested) {
-                PollWeather();
-                try { await Task.Delay(30_000, ct); }
-                catch (OperationCanceledException) { break; }
-            }
-        }
-
-        private void PollWeather() {
-            try {
-                var temp = _cmd.GetDouble(OnStepXProtocol.GetWeatherTemperature());
-                var pres = _cmd.GetDouble(OnStepXProtocol.GetWeatherPressure());
-                var hum  = _cmd.GetDouble(OnStepXProtocol.GetWeatherHumidity());
-                var dew  = _cmd.GetDouble(OnStepXProtocol.GetWeatherDewpoint());
-                var ctmp = _cmd.GetDouble(OnStepXProtocol.GetControllerTemperature());
-                var err  = GetLastErrorFromGu();
-
-                System.Windows.Application.Current?.Dispatcher.Invoke(() => {
-                    if (temp.HasValue) AmbientTemperatureCelsius    = temp.Value;
-                    if (pres.HasValue) BarometricPressureMb         = pres.Value;
-                    if (hum.HasValue)  RelativeHumidityPercent      = hum.Value;
-                    if (dew.HasValue)  DewPointCelsius              = dew.Value;
-                    if (ctmp.HasValue) ControllerTemperatureCelsius = ctmp.Value;
-                    if (err != null)   LastError                    = err;
-                });
-            } catch (Exception ex) {
-                Logger.Debug($"OnStepX weather poll: {ex.Message}");
-            }
-        }
-
-        // maybe get this from OnStepXMount.cs (merge with struff from settings pane)
-        private string? GetLastErrorFromGu() {
-            var gu = _cmd.SendString(OnStepXProtocol.GetStatus());
-            if (string.IsNullOrWhiteSpace(gu)) return null;
-            return gu[^1].ToString(CultureInfo.InvariantCulture);
+        private static void Dispatch(Action a) {
+            var app = System.Windows.Application.Current;
+            if (app != null) app.Dispatcher.Invoke(a);
+            else a();
         }
 
         private static string FormatPierSide(string raw) =>
@@ -223,7 +176,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         }
 
         public void Dispose() {
-            _weatherCts?.Cancel();
+            _mount.State.PropertyChanged -= OnMountStateChanged;
             _telescope.RemoveConsumer(this);
         }
     }
