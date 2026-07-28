@@ -80,90 +80,98 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 Mode      = opts.Mode
             });
 
-            for (int i = 0; i < points.Count; i++) {
-                ct.ThrowIfCancellationRequested();
+            // ClearImageStatus in the finally below guarantees ShowCapturedImageAsync's "OnStepX
+            // model plate-solve image" caption never stays stuck in NINA's status bar - whether
+            // the build completes normally, a point fails before reaching plate-solve, or the
+            // build is cancelled partway through.
+            try {
+                for (int i = 0; i < points.Count; i++) {
+                    ct.ThrowIfCancellationRequested();
 
-                var point = points[i];
-                if (point.State == AlignmentPointState.Added) continue; // already done (resumed)
+                    var point = points[i];
+                    if (point.State == AlignmentPointState.Added) continue; // already done (resumed)
 
-                try {
-                    await ProcessPointAsync(point, opts, progress, ct);
+                    try {
+                        await ProcessPointAsync(point, opts, progress, ct);
 
-                    if (point.State == AlignmentPointState.Added) {
-                        var sp = ToSavedPoint(point);
-                        completedPoints.Add(sp);
-                        session.Points = completedPoints;
-                        await _store.SaveAsync(session);
+                        if (point.State == AlignmentPointState.Added) {
+                            var sp = ToSavedPoint(point);
+                            completedPoints.Add(sp);
+                            session.Points = completedPoints;
+                            await _store.SaveAsync(session);
+                        }
+                    } catch (OperationCanceledException) {
+                        throw;
+                    } catch (Exception ex) {
+                        Logger.Error($"Point {i} failed: {ex.Message}");
+                        point.State = AlignmentPointState.Failed;
                     }
-                } catch (OperationCanceledException) {
-                    throw;
-                } catch (Exception ex) {
-                    Logger.Error($"Point {i} failed: {ex.Message}");
-                    point.State = AlignmentPointState.Failed;
+
+                    _mediator.NotifyProgress(new BuildProgressEventArgs {
+                        CompletedPoints = completedPoints.Count,
+                        TotalPoints     = points.Count,
+                        CurrentPoint    = point,
+                        StatusMessage   = $"Point {i + 1}/{points.Count} - {point.State}",
+                        AllPoints       = points
+                    });
                 }
 
-                _mediator.NotifyProgress(new BuildProgressEventArgs {
-                    CompletedPoints = completedPoints.Count,
-                    TotalPoints     = points.Count,
-                    CurrentPoint    = point,
-                    StatusMessage   = $"Point {i + 1}/{points.Count} - {point.State}",
-                    AllPoints       = points
-                });
-            }
+                // Reject plate solves that are catastrophically wrong (solver matched wrong field).
+                // Threshold = 3 × RmsErrorThresholdArcsec (default 3 × 3600" = 3°).
+                // This accepts all realistic pointing errors, even for poorly aligned mounts.
+                var goodPoints = session.Points
+                    .Where(p => Math.Abs(p.PointingErrorRAArcsec) < opts.RmsErrorThresholdArcsec * 3 &&
+                                 Math.Abs(p.PointingErrorDecArcsec) < opts.RmsErrorThresholdArcsec * 3)
+                    .ToList();
 
-            // Reject plate solves that are catastrophically wrong (solver matched wrong field).
-            // Threshold = 3 × RmsErrorThresholdArcsec (default 3 × 3600" = 3°).
-            // This accepts all realistic pointing errors, even for poorly aligned mounts.
-            var goodPoints = session.Points
-                .Where(p => Math.Abs(p.PointingErrorRAArcsec) < opts.RmsErrorThresholdArcsec * 3 &&
-                             Math.Abs(p.PointingErrorDecArcsec) < opts.RmsErrorThresholdArcsec * 3)
-                .ToList();
+                AlignmentModelCoefficients? coefficients = null;
 
-            AlignmentModelCoefficients? coefficients = null;
+                if (opts.Mode == BuildMode.FullSkyPointingModel) {
+                    double siteLat = 45.0;
+                    try { siteLat = _profile.ActiveProfile.AstrometrySettings.Latitude; } catch { }
 
-            if (opts.Mode == BuildMode.FullSkyPointingModel) {
-                double siteLat = 45.0;
-                try { siteLat = _profile.ActiveProfile.AstrometrySettings.Latitude; } catch { }
+                    if (opts.SolverMethod == PointingSolverMethod.GridSearch) {
+                        var mountType = await _mount.GetMountTypeAsync(ct);
+                        var harmonicTermConvention = await ResolveHarmonicTermConventionAsync(opts.HarmonicTermConvention, ct);
+                        coefficients = GridSearchPointingModelSolver.Solve(
+                            goodPoints, siteLat, mountType, harmonicTermConvention);
+                    } else {
+                        coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
+                    }
+                    Logger.Info($"ModelBuilder: {goodPoints.Count} good points → {opts.SolverMethod} solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
 
-                if (opts.SolverMethod == PointingSolverMethod.GridSearch) {
-                    var mountType = await _mount.GetMountTypeAsync(ct);
-                    var harmonicTermConvention = await ResolveHarmonicTermConventionAsync(opts.HarmonicTermConvention, ct);
-                    coefficients = GridSearchPointingModelSolver.Solve(
-                        goodPoints, siteLat, mountType, harmonicTermConvention);
+                    if (coefficients != null && opts.WriteModelToMountOnCompletion) {
+                        await _mount.WriteCoefficientsAsync(coefficients, ct);
+                    }
+                    if (coefficients != null && opts.WriteModelToMountOnCompletion && opts.SaveToEepromOnCompletion) {
+                        await _mount.SaveAlignmentToEepromAsync(ct);
+                    }
                 } else {
-                    coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
+                    var goodIndexes = goodPoints.Select(p => p.Index).ToHashSet();
+                    var controllerPoints = points.Where(p => goodIndexes.Contains(p.Index)).ToList();
+                    coefficients = await AlignmentUploadOrchestrator.UploadAndComputeAsync(
+                        _mount,
+                        controllerPoints,
+                        opts.SaveToEepromOnCompletion,
+                        delayAsync: null,
+                        ct);
                 }
-                Logger.Info($"ModelBuilder: {goodPoints.Count} good points → {opts.SolverMethod} solver returned {(coefficients != null ? "coefficients" : "null (need ≥ 6 points)")}.");
 
-                if (coefficients != null && opts.WriteModelToMountOnCompletion) {
-                    await _mount.WriteCoefficientsAsync(coefficients, ct);
-                }
-                if (coefficients != null && opts.WriteModelToMountOnCompletion && opts.SaveToEepromOnCompletion) {
-                    await _mount.SaveAlignmentToEepromAsync(ct);
-                }
-            } else {
-                var goodIndexes = goodPoints.Select(p => p.Index).ToHashSet();
-                var controllerPoints = points.Where(p => goodIndexes.Contains(p.Index)).ToList();
-                coefficients = await AlignmentUploadOrchestrator.UploadAndComputeAsync(
-                    _mount,
-                    controllerPoints,
-                    opts.SaveToEepromOnCompletion,
-                    delayAsync: null,
-                    ct);
+                session.Coefficients = coefficients;
+                try { await _store.SaveAsync(session); } catch { }
+
+                var residuals = goodPoints.Select(ResidualPoint.FromSavedPoint).ToList();
+                // NotifyCompleted is always called so the UI panel updates even on partial failure
+                _mediator.NotifyCompleted(new BuildCompletedEventArgs {
+                    Success      = coefficients != null,
+                    Coefficients = coefficients,
+                    Residuals    = residuals
+                });
+
+                return coefficients;
+            } finally {
+                ClearImageStatus();
             }
-
-            session.Coefficients = coefficients;
-            try { await _store.SaveAsync(session); } catch { }
-
-            var residuals = goodPoints.Select(ResidualPoint.FromSavedPoint).ToList();
-            // NotifyCompleted is always called so the UI panel updates even on partial failure
-            _mediator.NotifyCompleted(new BuildCompletedEventArgs {
-                Success      = coefficients != null,
-                Coefficients = coefficients,
-                Residuals    = residuals
-            });
-
-            return coefficients;
         }
 
         // Auto -> query the controller's firmware version and pick based on whether the
@@ -277,6 +285,11 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
             var result = await solver.SolveAsync(imageData, param, progress, ct);
 
+            // ShowCapturedImageAsync's "OnStepX model plate-solve image" caption is otherwise
+            // left in NINA's status bar indefinitely - clear it as soon as this point's solve is
+            // done rather than only at some later point (or never, if this is the last point).
+            ClearImageStatus();
+
             if (!result.Success) {
                 Logger.Warning($"Plate solve failed for point {point.Index} at Alt={point.AltitudeDeg:F1}° Az={point.AzimuthDeg:F1}°");
                 point.State = AlignmentPointState.Failed;
@@ -328,6 +341,13 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 throw;
             } catch (Exception ex) {
                 Logger.Warning($"Failed to show OnStepX model image in Image window: {ex.Message}");
+            }
+        }
+
+        private void ClearImageStatus() {
+            try { _imageControl.Status = new ApplicationStatus { Status = string.Empty }; }
+            catch (Exception ex) {
+                Logger.Warning($"Failed to clear OnStepX model image status: {ex.Message}");
             }
         }
 

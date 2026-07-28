@@ -204,9 +204,13 @@
                                         Visibility="{Binding IsNotBuilding, Converter={StaticResource BoolToVis}}"
                                         ToolTip="Slew to each point, plate-solve, and build the pointing model using the generated point list"/>
                                 <Button Content="■  Cancel" Command="{Binding CancelBuildCommand}"
-                                        Padding="8,4" FontWeight="Bold" Margin="0,0,0,0"
+                                        Padding="8,4" FontWeight="Bold" Margin="0,0,6,0"
                                         Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVis}}"
                                         ToolTip="Abort the running build after the current point completes"/>
+                                <Button Content="↺  Reset" Command="{Binding ResetCommand}"
+                                        Padding="8,4" FontWeight="Bold" Margin="0,0,0,0"
+                                        Visibility="{Binding IsNotBuilding, Converter={StaticResource BoolToVis}}"
+                                        ToolTip="Clear the completed or cancelled build's result (points, residuals, coefficients) and return to the planned point list"/>
                             </StackPanel>
                         </StackPanel>
                         </Border>

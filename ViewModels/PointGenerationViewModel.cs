@@ -97,6 +97,8 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                                             _ => _plannedPoints.Count > 0 && !_isBuilding
                                                 && _mountConnected && _camera.GetInfo().Connected);
             CancelBuildCommand            = new RelayCommand(_ => _buildCts?.Cancel(), _ => _isBuilding);
+            ResetCommand                  = new RelayCommand(_ => ResetBuild(),
+                                            _ => !_isBuilding && (_buildPoints.Count > 0 || _coefficients != null || _residuals.Count > 0));
             WriteToMountCommand           = new RelayCommand(async _ => await WriteCoefficientsAsync(), _ => _coefficients != null && _mountConnected);
             WriteToEepromCommand          = new RelayCommand(async _ => await WriteToEepromAsync(),     _ => _coefficients != null && _mountConnected);
             SaveModelCommand              = new RelayCommand(_ => SaveModel(),       _ => _coefficients != null);
@@ -292,6 +294,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         public ICommand LoadPointsCommand           { get; }
         public ICommand StartBuildCommand           { get; }
         public ICommand CancelBuildCommand          { get; }
+        public ICommand ResetCommand                { get; }
         public ICommand WriteToMountCommand         { get; }
         public ICommand WriteToEepromCommand        { get; }
         public ICommand SaveModelCommand            { get; }
@@ -421,6 +424,18 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
                 _buildCts?.Dispose();
                 _buildCts = null;
             }
+        }
+
+        // Clears a completed (or cancelled) build's result - build points, residuals, and
+        // coefficients - so the sky chart falls back to showing the planned points again. The
+        // planned point list itself is left untouched, so the same points can be built again.
+        private void ResetBuild() {
+            _buildPoints        = Array.Empty<AlignmentPoint>();
+            _residuals          = Array.Empty<ResidualPoint>();
+            Coefficients        = null;
+            BuildStatusMessage  = string.Empty;
+            RaisePropertyChanged(nameof(SkyPlot));
+            RaisePropertyChanged(nameof(ResidualPlot));
         }
 
         private async Task WriteCoefficientsAsync() {
