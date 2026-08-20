@@ -150,6 +150,50 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             };
         }
 
+        // Evaluates what pointing residual would remain at this point if the given coefficients
+        // were applied - the non-linearised form (using hca/hcp directly, matching README's
+        // "Pointing Model Mathematics") of the same errH/errD formula the design matrix above
+        // encodes, so this is the exact inverse of what Solve() just fit: given x (coefficients),
+        // predict b, and return the leftover (observed - predicted) in the same on-sky
+        // ΔRA/ΔDec arcsecond convention as ResidualPoint / PointingErrorRAArcsec.
+        public static ResidualPoint EvaluateResidual(
+            SavedModelPoint pt, AlignmentModelCoefficients c, double siteLatitudeDeg = 45.0) {
+
+            double H = pt.MountHAHours * 15.0 * Math.PI / 180.0;
+            double D = pt.MountDecDeg        * Math.PI / 180.0;
+
+            double cosLat = Math.Cos(siteLatitudeDeg * Math.PI / 180.0);
+            double sinLat = Math.Sin(siteLatitudeDeg * Math.PI / 180.0);
+            double sinH = Math.Sin(H), cosH = Math.Cos(H);
+            double sinD = Math.Sin(D), cosD = Math.Cos(D);
+            double tanD = Math.Tan(D);
+            double secD = 1.0 / Math.Max(cosD, 1e-4);
+            double p = pt.PierSide;
+
+            double dH = -pt.PointingErrorRAArcsec / Math.Max(cosD, 0.01);
+            double dD = pt.PointingErrorDecArcsec;
+
+            double hcpRad = c.Hcp * Math.PI / 180.0;
+            double dcpRad = c.Dcp * Math.PI / 180.0;
+
+            double dHPredicted = c.Ax1Cor - c.AltCor * sinH * tanD + c.AzmCor * cosH * tanD
+                                - c.DoCor * p * secD + c.PdCor * p * tanD
+                                - c.TfCor * cosLat * sinH * secD
+                                - c.Hca * Math.Cos(H + hcpRad) * p;
+
+            double dDPredicted = -c.Ax2Cor * p - c.AltCor * cosH - c.AzmCor * sinH
+                                + c.DfCor * (cosLat * cosH + sinLat * tanD)
+                                - c.TfCor * (cosLat * cosH * sinD - sinLat * cosD)
+                                - c.Dca * Math.Cos(D + dcpRad) * p;
+
+            double residualDH = dH - dHPredicted;
+            double residualDD = dD - dDPredicted;
+
+            return new ResidualPoint(
+                pt.AltitudeDeg, pt.AzimuthDeg,
+                -residualDH * cosD, residualDD);
+        }
+
         // Gaussian elimination with partial pivoting.
         private static double[]? GaussianElimination(double[,] A, double[] b) {
             int n = b.Length;

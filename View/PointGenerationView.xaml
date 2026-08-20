@@ -374,7 +374,7 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                     <TextBlock Text="Error Arrow scale:" VerticalAlignment="Center" FontSize="11" Margin="0,0,4,0"
                                             ToolTip="Multiply the auto-scaled residual error arrow lengths on the sky chart"/>
-                                    <Slider Width="110" Minimum="0.5" Maximum="20" SmallChange="0.5" LargeChange="2"
+                                    <Slider Width="110" Minimum="0.1" Maximum="20" SmallChange="0.1" LargeChange="2"
                                             Value="{Binding ErrorArrowScale}" VerticalAlignment="Center"
                                             ToolTip="Drag right to lengthen residual error arrows"/>
                                     <TextBlock Text="{Binding ErrorArrowScale, StringFormat=' ×{0:F1}'}"
@@ -418,6 +418,14 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+
+                    <!-- Appears once a model has been built: the same points as the Residuals
+                         chart pinned below, but with the solved model applied - shows the
+                         improvement the model provides. -->
+                    <oxy:PlotView Model="{Binding ResidualAfterModelPlot}" Background="#0a0a1e"
+                                  Height="260" Margin="0,10,0,4"
+                                  Visibility="{Binding HasResidualsAfterModel, Converter={StaticResource BoolToVis}}"
+                                  ToolTip="Residuals after the model is applied — same points as the Residuals chart below, recomputed with the solved coefficients; shows the improvement the model provides"/>
 
                 </StackPanel>
             </ScrollViewer>

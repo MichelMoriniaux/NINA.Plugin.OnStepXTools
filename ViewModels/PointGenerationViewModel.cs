@@ -53,6 +53,9 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         // Live points updated by build mediator events — shown with state colours during/after a build.
         private IReadOnlyList<AlignmentPoint> _buildPoints   = Array.Empty<AlignmentPoint>();
         private IReadOnlyList<ResidualPoint>  _residuals     = Array.Empty<ResidualPoint>();
+        // Same points as _residuals, recomputed with the solved model applied - shows the
+        // improvement the model provides. Only populated once a build has produced coefficients.
+        private IReadOnlyList<ResidualPoint>  _residualsAfterModel = Array.Empty<ResidualPoint>();
         private AlignmentModelCoefficients?   _coefficients;
 
         // ── Mount position (ITelescopeConsumer) ──────────────────────────────────
@@ -60,7 +63,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         private double _mountAzDeg;
         private bool   _mountConnected;
 
-        private double _errorArrowScale = 1.0;
+        private double _errorArrowScale = 0.1;
         private string _buildStatusMessage = string.Empty;
 
         public override string ContentId => "OnStepX_ModelBuilder";
@@ -257,7 +260,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             }
         }
 
-        public PlotModel ResidualPlot => BuildResidualScatter(_residuals);
+        public PlotModel ResidualPlot => BuildResidualScatter(_residuals, "Residuals");
+
+        // Appears once a model has been built - same points as ResidualPlot, recomputed with
+        // the solved coefficients applied.
+        public PlotModel ResidualAfterModelPlot => BuildResidualScatter(_residualsAfterModel, "Residuals After Model");
+
+        public bool HasResidualsAfterModel => _residualsAfterModel.Count > 0;
 
         // Called by the view's SizeChanged handler to force OxyPlot to re-render
         // the sky chart at the new container dimensions.
@@ -350,10 +359,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         private void OnBuildCompleted(object? sender, BuildCompletedEventArgs e) {
             System.Windows.Application.Current?.Dispatcher.Invoke(() => {
-                Coefficients = e.Coefficients;
-                _residuals   = e.Residuals;
+                Coefficients         = e.Coefficients;
+                _residuals           = e.Residuals;
+                _residualsAfterModel = e.ResidualsAfterModel;
                 RaisePropertyChanged(nameof(SkyPlot));
                 RaisePropertyChanged(nameof(ResidualPlot));
+                RaisePropertyChanged(nameof(ResidualAfterModelPlot));
+                RaisePropertyChanged(nameof(HasResidualsAfterModel));
             });
         }
 
@@ -430,12 +442,15 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
         // coefficients - so the sky chart falls back to showing the planned points again. The
         // planned point list itself is left untouched, so the same points can be built again.
         private void ResetBuild() {
-            _buildPoints        = Array.Empty<AlignmentPoint>();
-            _residuals          = Array.Empty<ResidualPoint>();
-            Coefficients        = null;
-            BuildStatusMessage  = string.Empty;
+            _buildPoints         = Array.Empty<AlignmentPoint>();
+            _residuals           = Array.Empty<ResidualPoint>();
+            _residualsAfterModel = Array.Empty<ResidualPoint>();
+            Coefficients         = null;
+            BuildStatusMessage   = string.Empty;
             RaisePropertyChanged(nameof(SkyPlot));
             RaisePropertyChanged(nameof(ResidualPlot));
+            RaisePropertyChanged(nameof(ResidualAfterModelPlot));
+            RaisePropertyChanged(nameof(HasResidualsAfterModel));
         }
 
         private async Task WriteCoefficientsAsync() {
@@ -539,7 +554,7 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
             double                        mountAzDeg           = 0,
             bool                          mountConnected       = false,
             IReadOnlyList<ResidualPoint>? residuals            = null,
-            double                        errorArrowScale      = 1.0,
+            double                        errorArrowScale      = 0.1,
             bool                          inBuildMode          = false) {
 
             var model = CreateBaseSkyModel();
@@ -720,9 +735,13 @@ namespace NINA.Plugin.OnStepXTools.ViewModels {
 
         // ── Residuals scatter plot ────────────────────────────────────────────────
 
-        private static PlotModel BuildResidualScatter(IReadOnlyList<ResidualPoint> residuals) {
+        private static PlotModel BuildResidualScatter(IReadOnlyList<ResidualPoint> residuals, string title) {
             var model = new PlotModel {
-                Title      = "Residuals",
+                Title      = title,
+                // Keeps the X and Y axes at the same arcsec-per-pixel scale regardless of the
+                // container's aspect ratio - same technique CreateBaseSkyModel uses - so the RMS
+                // circle actually renders as a circle instead of an oval.
+                PlotType   = PlotType.Cartesian,
                 Background = OxyColor.FromRgb(0x0a, 0x0a, 0x1e),
                 TextColor  = OxyColors.LightGray
             };

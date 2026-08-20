@@ -58,6 +58,46 @@ public class PointingModelSolverTests {
         Assert.Equal(points.Count, actual.Stars);
     }
 
+    [Fact]
+    public void EvaluateResidual_ReturnsNearZero_WhenCoefficientsMatchGeneratingModel() {
+        const double siteLatitudeDeg = 42.0;
+        var coefficients = new AlignmentModelCoefficients {
+            Ax1Cor = 120,
+            Ax2Cor = -85,
+            AltCor = 42,
+            AzmCor = -37,
+            DoCor = 28,
+            PdCor = -19,
+            DfCor = 17,
+            TfCor = -11,
+            Hcp = 35,
+            Hca = 24,
+            Dcp = -22,
+            Dca = 18
+        };
+
+        foreach (var decDeg in new[] { -20.0, -5.0, 12.0, 28.0, 44.0, 58.0 }) {
+            foreach (var haHours in new[] { -5.0, -3.0, -1.25, 1.25, 3.0, 5.0 }) {
+                var pierSide = haHours >= 0.0 ? 1 : -1;
+                var (raErrorArcsec, decErrorArcsec) = ComputeGemPointingError(coefficients, siteLatitudeDeg, haHours, decDeg, pierSide);
+                var point = new SavedModelPoint {
+                    MountHAHours = haHours,
+                    MountDecDeg = decDeg,
+                    PierSide = pierSide,
+                    PointingErrorRAArcsec = raErrorArcsec,
+                    PointingErrorDecArcsec = decErrorArcsec
+                };
+
+                // Synthetic data was generated exactly from `coefficients`, so applying those
+                // same coefficients back should leave (near) nothing unexplained.
+                var residual = PointingModelSolver.EvaluateResidual(point, coefficients, siteLatitudeDeg);
+
+                Assert.InRange(residual.ErrorRAArcsec, -0.01, 0.01);
+                Assert.InRange(residual.ErrorDecArcsec, -0.01, 0.01);
+            }
+        }
+    }
+
     private static (double raErrorArcsec, double decErrorArcsec) ComputeGemPointingError(
         AlignmentModelCoefficients c,
         double siteLatitudeDeg,

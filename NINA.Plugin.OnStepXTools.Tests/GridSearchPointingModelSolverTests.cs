@@ -153,6 +153,55 @@ public class GridSearchPointingModelSolverTests {
         Assert.InRange(actual.Dca, 0, 600);
     }
 
+    [Theory]
+    [InlineData(false, HarmonicTermConvention.PolarResidualLegacy)]
+    [InlineData(true, HarmonicTermConvention.AxisAngleFixed)]
+    public void EvaluateResidual_ReturnsNearZero_WhenCoefficientsMatchGeneratingModel(
+        bool useAxisAngleForHarmonics, HarmonicTermConvention convention) {
+
+        const double siteLatitudeDeg = 42.0;
+        var coefficients = new AlignmentModelCoefficients {
+            Ax1Cor = 120,
+            Ax2Cor = -85,
+            AltCor = 42,
+            AzmCor = -37,
+            DoCor = 28,
+            PdCor = -19,
+            DfCor = 17,
+            TfCor = -11,
+            Hcp = 35,
+            Hca = 24,
+            Dcp = -22,
+            Dca = 18
+        };
+
+        foreach (var decDeg in new[] { -20.0, -5.0, 12.0, 28.0, 44.0, 58.0 }) {
+            foreach (var haHours in new[] { -5.0, -3.0, -1.25, 1.25, 3.0, 5.0 }) {
+                foreach (var pierSide in new[] { 1, -1 }) {
+                    var (raErrorArcsec, decErrorArcsec) = ComputeMountToObservedPlaceError(
+                        coefficients, siteLatitudeDeg, haHours, decDeg, pierSide, useAxisAngleForHarmonics);
+                    var point = new SavedModelPoint {
+                        MountHAHours = haHours,
+                        MountDecDeg = decDeg,
+                        PierSide = pierSide,
+                        PointingErrorRAArcsec = raErrorArcsec,
+                        PointingErrorDecArcsec = decErrorArcsec
+                    };
+
+                    // Synthetic data was generated exactly from `coefficients` via the real
+                    // mountToObservedPlace() port, so applying those same coefficients back
+                    // (with the matching harmonic convention) should leave (near) nothing
+                    // unexplained.
+                    var residual = GridSearchPointingModelSolver.EvaluateResidual(
+                        point, coefficients, siteLatitudeDeg, MountType.GEM, convention);
+
+                    Assert.InRange(residual.ErrorRAArcsec, -0.01, 0.01);
+                    Assert.InRange(residual.ErrorDecArcsec, -0.01, 0.01);
+                }
+            }
+        }
+    }
+
     // Verbatim port of GeoAlign::mountToObservedPlace() for a GEM/EQ mount, used to
     // generate noiseless synthetic pointing errors that are internally consistent with
     // what GridSearchPointingModelSolver actually models. useAxisAngleForHarmonics selects
