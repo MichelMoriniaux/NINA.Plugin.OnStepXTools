@@ -126,15 +126,21 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
 
                 AlignmentModelCoefficients? coefficients = null;
 
-                if (opts.Mode == BuildMode.FullSkyPointingModel) {
-                    double siteLat = 45.0;
-                    try { siteLat = _profile.ActiveProfile.AstrometrySettings.Latitude; } catch { }
+                double siteLat = 45.0;
+                try { siteLat = _profile.ActiveProfile.AstrometrySettings.Latitude; } catch { }
 
+                // Only set (and only consulted) when SolverMethod == GridSearch - determines how
+                // ResidualsAfterModel below must evaluate the harmonic (hcp/hca/dcp/dca) terms so
+                // it matches whichever formula actually produced these coefficients.
+                var gridSearchMountType = MountType.GEM;
+                var gridSearchConvention = HarmonicTermConvention.PolarResidualLegacy;
+
+                if (opts.Mode == BuildMode.FullSkyPointingModel) {
                     if (opts.SolverMethod == PointingSolverMethod.GridSearch) {
-                        var mountType = await _mount.GetMountTypeAsync(ct);
-                        var harmonicTermConvention = await ResolveHarmonicTermConventionAsync(opts.HarmonicTermConvention, ct);
+                        gridSearchMountType = await _mount.GetMountTypeAsync(ct);
+                        gridSearchConvention = await ResolveHarmonicTermConventionAsync(opts.HarmonicTermConvention, ct);
                         coefficients = GridSearchPointingModelSolver.Solve(
-                            goodPoints, siteLat, mountType, harmonicTermConvention);
+                            goodPoints, siteLat, gridSearchMountType, gridSearchConvention);
                     } else {
                         coefficients = PointingModelSolver.Solve(goodPoints, siteLat);
                     }
@@ -161,11 +167,31 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
                 try { await _store.SaveAsync(session); } catch { }
 
                 var residuals = goodPoints.Select(ResidualPoint.FromSavedPoint).ToList();
+
+                // Same points, recomputed with the solved coefficients applied - shows how much
+                // of the raw pointing error the model actually removes. Star Alignment mode's
+                // coefficients are read back from the controller (real firmware output), so they
+                // always evaluate against PointingModelSolver's formula - the same one the
+                // firmware's own correct()/mountToObservedPlace() implements (see README's
+                // "Pointing Model Mathematics"). Grid-search-solved coefficients must be
+                // evaluated with the matching mount type/harmonic convention or the harmonic
+                // (hcp/hca/dcp/dca) terms would be scored against the wrong formula.
+                List<ResidualPoint> residualsAfterModel;
+                if (coefficients == null) {
+                    residualsAfterModel = new List<ResidualPoint>();
+                } else if (opts.Mode == BuildMode.FullSkyPointingModel && opts.SolverMethod == PointingSolverMethod.GridSearch) {
+                    residualsAfterModel = goodPoints.Select(p => GridSearchPointingModelSolver.EvaluateResidual(
+                        p, coefficients, siteLat, gridSearchMountType, gridSearchConvention)).ToList();
+                } else {
+                    residualsAfterModel = goodPoints.Select(p => PointingModelSolver.EvaluateResidual(p, coefficients, siteLat)).ToList();
+                }
+
                 // NotifyCompleted is always called so the UI panel updates even on partial failure
                 _mediator.NotifyCompleted(new BuildCompletedEventArgs {
-                    Success      = coefficients != null,
-                    Coefficients = coefficients,
-                    Residuals    = residuals
+                    Success             = coefficients != null,
+                    Coefficients        = coefficients,
+                    Residuals           = residuals,
+                    ResidualsAfterModel = residualsAfterModel
                 });
 
                 return coefficients;

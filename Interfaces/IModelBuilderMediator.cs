@@ -31,6 +31,9 @@ namespace NINA.Plugin.OnStepXTools.Interfaces {
         public bool Success { get; init; }
         public AlignmentModelCoefficients? Coefficients { get; init; }
         public IReadOnlyList<ResidualPoint> Residuals { get; init; } = Array.Empty<ResidualPoint>();
+        // Same points as Residuals, recomputed with Coefficients applied - shows the
+        // improvement the model provides. Empty when no model was produced.
+        public IReadOnlyList<ResidualPoint> ResidualsAfterModel { get; init; } = Array.Empty<ResidualPoint>();
         public string? ErrorMessage { get; init; }
     }
 

@@ -454,6 +454,79 @@ namespace NINA.Plugin.OnStepXTools.ModelManagement {
             return deg;
         }
 
+        // Evaluates what pointing residual would remain at this point if the given (already
+        // solved) coefficients were applied - the same "actual minus predicted" comparison
+        // DoSearch()/Residual() use internally while fitting, run once against the final
+        // coefficients instead of searching. Reuses Correct() directly for the 8-core part so it
+        // can never drift from the fitting code; the harmonic phase/convention selection mirrors
+        // SolveHarmonicTerms()'s per-star setup exactly.
+        public static ResidualPoint EvaluateResidual(
+            SavedModelPoint pt, AlignmentModelCoefficients c,
+            double siteLatitudeDeg, MountType mountType, HarmonicTermConvention convention) {
+
+            double cosLat = Math.Cos(siteLatitudeDeg * Math.PI / 180.0);
+            double sinLat = Math.Sin(siteLatitudeDeg * Math.PI / 180.0);
+
+            double mountH = pt.MountHAHours * 15.0 * Math.PI / 180.0;
+            double mountD = pt.MountDecDeg * Math.PI / 180.0;
+            double cosD0  = Math.Cos(mountD);
+            int side = pt.PierSide >= 0 ? 1 : -1;
+
+            // Same errH/errD convention as Solve(): errRA already carries a cos(Dec) factor,
+            // divide it out; errH = observed_H - mount_H.
+            double errH = -pt.PointingErrorRAArcsec / Math.Max(cosD0, 0.01) * ArcsecToRadScale;
+            double errD = pt.PointingErrorDecArcsec * ArcsecToRadScale;
+            double actualAx1 = mountH + errH;
+            double actualAx2 = mountD + errD;
+
+            // ── 8-core correction - identical to DoSearch()'s ma1/ma2 + Correct() call ──────
+            double ax1Cor = ArcsecToRad(c.Ax1Cor);
+            double ax2Cor = ArcsecToRad(c.Ax2Cor);
+            double ma1 = mountH + ax1Cor;          // Ohe == Ohw always, see Solve()
+            double ma2 = mountD - ax2Cor * side;   // matches Odw/Ode's east/west split
+
+            double sinA1 = Math.Sin(ma1), cosA1 = Math.Cos(ma1);
+            double sinA2 = Math.Sin(ma2), cosA2 = Math.Cos(ma2);
+            double tanA2 = sinA2 / cosA2;
+
+            bool useFf = IsForkLike(mountType) || IsAltAzLike(mountType);
+            double dfParam = useFf ? 0.0 : ArcsecToRad(c.DfCor);
+            double ffParam = useFf ? ArcsecToRad(c.DfCor) : 0.0;
+
+            Correct(cosLat, sinLat, cosA1, sinA1, cosA2, sinA2, tanA2, side,
+                ArcsecToRad(c.DoCor), ArcsecToRad(c.PdCor), ArcsecToRad(c.AzmCor), ArcsecToRad(c.AltCor),
+                dfParam, ffParam, ArcsecToRad(c.TfCor),
+                out double a1r, out double a2r);
+
+            // ── Harmonic term - identical phase/convention selection as SolveHarmonicTerms() ──
+            double azmCor = ArcsecToRad(c.AzmCor);
+            double altCor = ArcsecToRad(c.AltCor);
+            double thisA1 = -azmCor * cosA1 * tanA2 + altCor * sinA1 * tanA2;
+            double thisA2 = azmCor * sinA1 + altCor * cosA1;
+
+            double decPhaseArg = ma2;
+            if (side < 0) decPhaseArg = sinLat >= 0.0 ? Math.PI - ma2 : -Math.PI - ma2;
+
+            double phaseA1 = convention == HarmonicTermConvention.AxisAngleFixed ? ma1 : thisA1;
+            double phaseA2 = convention == HarmonicTermConvention.AxisAngleFixed ? decPhaseArg : thisA2;
+
+            double cosTermH = ArcsecToRad(c.Hca) * Math.Cos(phaseA1 + c.Hcp * Math.PI / 180.0) * side;
+            double cosTermD = ArcsecToRad(c.Dca) * Math.Cos(phaseA2 + c.Dcp * Math.PI / 180.0) * side;
+
+            double predictedAx1 = ma1 - (a1r + cosTermH);
+            double predictedAx2 = ma2 - (a2r + cosTermD);
+
+            double d1 = WrapPi(actualAx1 - predictedAx1);
+            double d2 = actualAx2 - predictedAx2;
+
+            // On-sky ΔRA convention (cos(actual Dec)-scaled), matching ResidualPoint /
+            // PointingErrorRAArcsec and the same weighting doSearch()'s fitting metric uses.
+            double raArcsec  = RadToArcsec(d1 * Math.Cos(actualAx2));
+            double decArcsec = RadToArcsec(d2);
+
+            return new ResidualPoint(pt.AltitudeDeg, pt.AzimuthDeg, raArcsec, decArcsec);
+        }
+
         // ── Small helpers ────────────────────────────────────────────────────────
 
         private static bool IsForkLike(MountType t) =>
